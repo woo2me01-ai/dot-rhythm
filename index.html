@@ -1,0 +1,860 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>리듬 점 클릭</title>
+<style>
+  :root{
+    --bg:#0e1124; --panel:#181c3a; --line:#2a3060;
+    --ink:#eef1ff; --muted:#8e94bb;
+    --mint:#3ee6c1; --lime:#c6f432; --gold:#ffc84a; --red:#ff5d73; --blue:#4aa8ff;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;background:var(--bg);color:var(--ink);
+    font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+    overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none}
+  canvas{position:fixed;inset:0;display:block;cursor:crosshair}
+
+  /* 상단 정보판 */
+  #hud{position:fixed;top:0;left:0;right:0;z-index:2;padding:10px 12px 0;pointer-events:none}
+  #stats{display:flex;gap:8px;justify-content:center}
+  .stat{background:rgba(24,28,58,.85);border:1px solid var(--line);border-radius:12px;
+    padding:6px 10px;min-width:70px;text-align:center}
+  .stat span{display:block;font-size:11px;color:var(--muted);letter-spacing:.04em}
+  .stat b{display:block;font-size:20px;font-variant-numeric:tabular-nums;line-height:1.2}
+  #comboStat b{color:var(--lime)}
+  #lives{text-align:center;margin-top:6px;font-size:18px;letter-spacing:4px}
+  #lives .on{color:var(--red)} #lives .off{color:#3a3f6a}
+  #lives.warn{animation:warn .5s ease-in-out 3}
+  @keyframes warn{50%{transform:scale(1.25)}}
+  .red{color:var(--red)}
+  .reason{font-size:14px;margin:8px 0 2px;color:var(--muted)}
+  #timebar{height:6px;margin:8px auto 0;max-width:420px;background:var(--line);border-radius:3px;overflow:hidden}
+  #timefill{height:100%;width:100%;background:linear-gradient(90deg,var(--mint),var(--lime));transform-origin:left}
+  #muteBtn{position:fixed;bottom:14px;right:14px;z-index:4;pointer-events:auto;
+    width:36px;height:36px;border-radius:50%;border:1px solid var(--line);
+    background:rgba(24,28,58,.85);color:var(--ink);font-size:16px;cursor:pointer}
+
+  /* 레벨 알림 */
+  #toast{position:fixed;left:50%;top:124px;transform:translateX(-50%);z-index:2;
+    font-weight:800;font-size:18px;color:var(--lime);white-space:nowrap;opacity:0;pointer-events:none;
+    text-shadow:0 2px 12px rgba(0,0,0,.6)}
+  #toast.show{animation:toast 2.2s ease-out}
+  @keyframes toast{0%{opacity:0;transform:translate(-50%,-8px)}12%{opacity:1;transform:translate(-50%,0)}75%{opacity:1}100%{opacity:0}}
+
+  #countdown{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:3;
+    font-size:96px;font-weight:900;color:var(--mint);pointer-events:none}
+
+  /* 시작/결과 화면 */
+  .overlay{position:fixed;inset:0;z-index:5;display:flex;align-items:center;justify-content:center;
+    background:rgba(14,17,36,.88);padding:16px}
+  .overlay.hidden{display:none}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:20px;
+    padding:26px 22px;width:100%;max-width:380px;text-align:center;max-height:100%;overflow:auto}
+  .card h1{font-size:26px;margin-bottom:6px}
+  .card h1 em{font-style:normal;color:var(--mint)}
+  .card p.sub{color:var(--muted);font-size:14px;margin-bottom:16px}
+  .rules{text-align:left;font-size:14px;line-height:1.7;background:rgba(0,0,0,.18);
+    border-radius:12px;padding:12px 14px;margin-bottom:16px}
+  .rules li{list-style:none}
+  .gold{color:var(--gold)} .blue{color:var(--blue)} .lime{color:var(--lime)} .mint{color:var(--mint)}
+  .big{font-size:52px;font-weight:900;line-height:1.1;font-variant-numeric:tabular-nums}
+  .newbest{display:inline-block;margin:6px 0 4px;padding:3px 10px;border-radius:999px;
+    background:var(--gold);color:#2a1d00;font-weight:800;font-size:13px}
+  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:14px 0}
+  .grid div{background:rgba(0,0,0,.18);border-radius:10px;padding:8px}
+  .grid span{display:block;font-size:11px;color:var(--muted)}
+  .grid b{font-size:18px}
+  .records{text-align:left;margin:4px 0 16px}
+  .records h3{font-size:13px;color:var(--muted);margin-bottom:6px;font-weight:600}
+  .records ol{list-style:none;font-size:14px}
+  .records li{display:flex;justify-content:space-between;padding:5px 8px;border-radius:8px}
+  .records li:nth-child(odd){background:rgba(0,0,0,.15)}
+  .records li.me{background:rgba(62,230,193,.18);color:var(--mint);font-weight:700}
+  .records .empty{color:var(--muted);font-size:13px;padding:4px 8px}
+  .btn{display:block;width:100%;border:0;border-radius:14px;padding:14px;font-size:17px;font-weight:800;
+    background:linear-gradient(90deg,var(--mint),var(--lime));color:#0b1a14;cursor:pointer}
+  .btn:active{transform:scale(.98)}
+
+  /* 반응 시간 + 이모지 공유 */
+  .rt-line{margin:6px 0 2px;font-size:15px;color:var(--ink)}
+  .rt-line b{font-size:20px;color:var(--lime);font-variant-numeric:tabular-nums}
+  .rt-rank{display:inline-block;margin-left:6px;padding:2px 9px;border-radius:999px;
+    background:rgba(198,244,50,.14);color:var(--lime);font-size:13px;font-weight:700}
+  .share{background:rgba(0,0,0,.22);border:1px dashed var(--line);border-radius:14px;padding:12px;margin:0 0 12px}
+  .share h3{font-size:13px;color:var(--muted);font-weight:600;margin-bottom:8px}
+  .share .emoji{font-size:22px;letter-spacing:0;line-height:1.3;white-space:nowrap;
+    user-select:text;-webkit-user-select:text}
+  .share .legend{font-size:11px;color:var(--muted);margin-top:6px;line-height:1.5}
+  .btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--mint);margin-top:10px;font-size:15px;padding:12px}
+  .btn.ghost.done{background:var(--mint);color:#0b1a14}
+  .records li small{color:var(--muted);font-weight:400;margin-left:6px;font-size:12px}
+  .share-btns{display:flex;gap:8px;margin-top:10px}
+  .share-btns .btn{margin-top:0;font-size:15px;padding:12px 8px}
+  .share-msg{min-height:16px;margin-top:6px;font-size:12px;color:var(--mint)}
+
+  /* 언어 선택 EN / KR */
+  #langSwitch{position:fixed;top:12px;right:12px;z-index:6;display:flex;gap:2px;padding:3px;
+    border:1px solid var(--line);border-radius:999px;background:rgba(24,28,58,.92)}
+  #langSwitch button{border:0;background:transparent;color:var(--muted);font-weight:800;font-size:12px;
+    padding:5px 10px;border-radius:999px;cursor:pointer;font-family:inherit}
+  #langSwitch button.on{background:var(--mint);color:#0b1a14}
+  body.playing #langSwitch{display:none}   /* 게임 중에는 숨김 (점 누르는 데 방해되지 않게) */
+</style>
+</head>
+<body>
+
+<canvas id="c"></canvas>
+
+<div id="hud">
+  <div id="stats">
+    <div class="stat"><span data-i18n="hudScore">점수</span><b id="scoreEl">0</b></div>
+    <div class="stat" id="comboStat"><span data-i18n="hudCombo">콤보</span><b id="comboEl">0</b></div>
+    <div class="stat"><span data-i18n="hudLevel">레벨</span><b id="levelEl">1</b></div>
+    <div class="stat"><span data-i18n="hudTime">남은 시간</span><b id="timeEl">120</b></div>
+  </div>
+  <div id="timebar"><div id="timefill"></div></div>
+  <div id="lives"></div>
+</div>
+<button id="muteBtn" title="소리 켜기/끄기">🔊</button>
+<div id="langSwitch" role="group" aria-label="Language">
+  <button data-lang="en">EN</button><button data-lang="ko">KR</button>
+</div>
+<div id="toast"></div>
+<div id="countdown"></div>
+
+<!-- 시작 화면 -->
+<div class="overlay" id="startScreen">
+  <div class="card">
+    <h1 data-i18n-html="title">리듬 <em>점</em> 클릭</h1>
+    <p class="sub" data-i18n="subtitle">2분(120초) 동안 박자에 맞춰 점을 눌러 보세요</p>
+    <ul class="rules" data-i18n-html="rules">
+      <li>● 화면에 나타난 <b class="mint">점</b>을 누르면 <b>+10점</b></li>
+      <li>★ 다섯 번째마다 <b class="gold">황금 점</b>이 나와요: <b>+50점</b></li>
+      <li>◆ 콤보 30회마다 <b class="blue">파란 점</b>이 나와요: <b>+100점</b></li>
+      <li>♪ <b class="lime">박자</b>에 딱 맞춰 누르면 PERFECT <b>+5점</b></li>
+      <li>⏱ 10초마다 점이 <b>작아지고 빨라져요</b> <span style="white-space:nowrap">(총 12단계)</span></li>
+      <li>🔥 콤보 10회마다 점수 배율 ×2, ×3, ×4</li>
+      <li>✕ 점을 놓치거나 빈 곳을 누르면 <b class="red">틀림</b> (콤보도 끊겨요)</li>
+      <li>❤ 기회는 3번! <b class="red">3번째 틀리면 게임 끝</b></li>
+    </ul>
+    <div class="records" id="startRecords"></div>
+    <button class="btn" id="startBtn" data-i18n="start">게임 시작</button>
+  </div>
+</div>
+
+<!-- 결과 화면 -->
+<div class="overlay hidden" id="endScreen">
+  <div class="card">
+    <p class="sub" style="margin-bottom:4px" data-i18n="finalScore">최종 점수</p>
+    <div class="big" id="finalScore">0</div>
+    <div class="reason" id="endReason"></div>
+    <div id="bestBadge"></div>
+    <div class="rt-line">⚡ <span data-i18n="avgRt">평균 반응 시간</span> <b id="rAvgRt">–</b><span class="rt-rank" id="rRank"></span></div>
+    <div class="grid">
+      <div><span data-i18n="rHits">맞힌 점</span><b id="rHits">0</b></div>
+      <div><span data-i18n="rAcc">정확도</span><b id="rAcc">0%</b></div>
+      <div><span data-i18n="rCombo">최대 콤보</span><b id="rCombo">0</b></div>
+      <div><span data-i18n="rSpecial">황금 · 파란 점 / PERFECT</span><b id="rSpecial">0</b></div>
+      <div><span data-i18n="rBestRt">가장 빠른 반응</span><b id="rBestRt">–</b></div>
+      <div><span data-i18n="rWorstRt">가장 느린 반응</span><b id="rWorstRt">–</b></div>
+    </div>
+    <div class="share">
+      <h3 data-i18n="shareTitle">📣 내 성적표 (친구에게 자랑하기)</h3>
+      <div class="emoji" id="shareEmoji"></div>
+      <div class="legend" data-i18n-html="legend">🟩 빠름 · 🟨 보통 · 🟧 느림 · 🟥 실수 · ⬛ 못 감<br>한 칸 = 15초 구간</div>
+      <div class="share-btns">
+        <button class="btn" id="shareBtn" data-i18n="shareBtn">📤 공유하기</button>
+        <button class="btn ghost" id="copyBtn" data-i18n="copyBtn">📋 복사하기</button>
+      </div>
+      <div class="share-msg" id="shareMsg"></div>
+    </div>
+    <div class="records" id="endRecords"></div>
+    <button class="btn" id="againBtn" data-i18n="again">다시 하기</button>
+  </div>
+</div>
+
+<script>
+/* ===================== 설정값 (여기만 바꾸면 난이도 조절) ===================== */
+const ROUND_SECONDS = 120;       // 한 판 길이 (2분) — 바꾸면 화면 안내 문구도 자동으로 바뀝니다
+const LEVEL_SECONDS = 10;        // 몇 초마다 레벨이 오르는지
+const SPECIAL_EVERY = 5;         // 몇 번째마다 황금 점이 나오는지
+const LEVELS = [
+  // 규칙: 10초마다 한 단계씩 점은 작아지고(r), 빨라지고(speed), 더 빨리 사라지고(life), 박자는 빨라짐(bpm)
+  // r: 점 반지름(px)  speed: 이동 속도(px/초)  life: 점이 사라지기까지(초)  bpm: 박자 빠르기
+  { r: 66, speed:   0, life: 2.60, bpm: 100, msg: "LEVEL 1 · 큰 점부터 천천히", msgEn: "LEVEL 1 · Big dots, nice and slow" },  // 0~10초
+  { r: 62, speed:  60, life: 2.45, bpm: 105, msg: "LEVEL 2 · 점이 움직이기 시작해요", msgEn: "LEVEL 2 · The dots start moving" },  // 10~20초
+  { r: 58, speed:  88, life: 2.31, bpm: 111, msg: "LEVEL 3 · 더 작고 빠르게", msgEn: "LEVEL 3 · Smaller and faster" },  // 20~30초
+  { r: 53, speed: 116, life: 2.16, bpm: 116, msg: "LEVEL 4 · 박자마다 방향이 바뀌어요!", msgEn: "LEVEL 4 · Dots turn on the beat!" },  // 30~40초
+  { r: 49, speed: 144, life: 2.02, bpm: 122, msg: "LEVEL 5 · 더 작고 더 빠르게", msgEn: "LEVEL 5 · Even smaller, even faster" },  // 40~50초
+  { r: 45, speed: 172, life: 1.87, bpm: 127, msg: "LEVEL 6 · 더 작고 더 빠르게", msgEn: "LEVEL 6 · Even smaller, even faster" },  // 50~60초
+  { r: 41, speed: 200, life: 1.73, bpm: 133, msg: "LEVEL 7 · 1분 돌파! 계속 가요", msgEn: "LEVEL 7 · 1 minute in! Keep going" },  // 60~70초
+  { r: 37, speed: 228, life: 1.58, bpm: 138, msg: "LEVEL 8 · 더 작고 더 빠르게", msgEn: "LEVEL 8 · Even smaller, even faster" },  // 70~80초
+  { r: 33, speed: 256, life: 1.44, bpm: 144, msg: "LEVEL 9 · 이제부터 진짜!", msgEn: "LEVEL 9 · Now it gets real!" },  // 80~90초
+  { r: 28, speed: 284, life: 1.29, bpm: 149, msg: "LEVEL 10 · 더 작고 더 빠르게", msgEn: "LEVEL 10 · Even smaller, even faster" },  // 90~100초
+  { r: 24, speed: 312, life: 1.15, bpm: 155, msg: "LEVEL 11 · 더 작고 더 빠르게", msgEn: "LEVEL 11 · Even smaller, even faster" },  // 100~110초
+  { r: 20, speed: 340, life: 1.00, bpm: 160, msg: "LEVEL 12 · 마지막 10초!", msgEn: "LEVEL 12 · Final 10 seconds!" },  // 110~120초
+];
+const POINTS_NORMAL = 10, POINTS_SPECIAL = 50, POINTS_PERFECT = 5;
+const BLUE_EVERY_COMBO = 30;     // 콤보 몇 회마다 파란 점이 나오는지
+const POINTS_BLUE = 100;         // 파란 점 점수
+const MAX_MISSES = 3;            // 몇 번 틀리면 게임이 끝나는지
+const PERFECT_WINDOW = 0.09;     // 박자 앞뒤 몇 초까지 PERFECT로 인정할지
+const STORAGE_KEY = "dotRhythm.records.120s.3miss";   // 120초 + 3번 틀리면 끝 버전 기록 (3분 버전 기록과 섞이지 않게 따로 보관)
+
+/* ----- 반응 시간 & 이모지 성적표 설정 ----- */
+const BLOCK_SECONDS = 15;        // 이모지 한 칸이 몇 초 구간인지 (120 ÷ 15 = 8칸)
+const RT_FAST = 0.50;            // 이 시간(초)보다 빠르면 🟩
+const RT_OK   = 0.70;            // 이 시간(초)보다 빠르면 🟨, 그보다 느리면 🟧
+const RT_RANKS = [               // 평균 반응 시간에 따른 칭호
+  { max: 0.40, ko: "⚡ 번개급",   en: "⚡ Lightning" },
+  { max: 0.50, ko: "🐆 치타급",   en: "🐆 Cheetah" },
+  { max: 0.65, ko: "🐇 토끼급",   en: "🐇 Rabbit" },
+  { max: 99,   ko: "🐢 거북이급", en: "🐢 Turtle" },
+];
+const SHARE_URL = "";            // 홈페이지에 올린 뒤 게임 주소를 넣으세요. 비워 두면 현재 주소(http/https일 때만)를 씁니다.
+
+/* ===================== 언어 (EN / KR) ===================== */
+// 글자를 고치려면 여기만 바꾸면 됩니다. ko = 한국어, en = 영어
+const I18N = {
+  ko: {
+    pageTitle: "리듬 점 클릭",
+    gameTitle: "🎯 리듬 점 클릭",
+    title: "리듬 <em>점</em> 클릭",
+    subtitle: () => `${durKo()}(${ROUND_SECONDS}초) 동안 박자에 맞춰 점을 눌러 보세요`,
+    rules: () => `
+      <li>● 화면에 나타난 <b class="mint">점</b>을 누르면 <b>+10점</b></li>
+      <li>★ 다섯 번째마다 <b class="gold">황금 점</b>이 나와요: <b>+50점</b></li>
+      <li>◆ 콤보 ${BLUE_EVERY_COMBO}회마다 <b class="blue">파란 점</b>이 나와요: <b>+${POINTS_BLUE}점</b></li>
+      <li>♪ <b class="lime">박자</b>에 딱 맞춰 누르면 PERFECT <b>+5점</b></li>
+      <li>⚡ 점이 나타나서 누를 때까지 <b>반응 시간</b>을 재요</li>
+      <li>⏱ 10초마다 점이 <b>작아지고 빨라져요</b> <span style="white-space:nowrap">(총 ${LEVELS.length}단계)</span></li>
+      <li>🔥 콤보 10회마다 점수 배율 ×2, ×3, ×4</li>
+      <li>✕ 점을 놓치거나 빈 곳을 누르면 <b class="red">틀림</b> (콤보도 끊겨요)</li>
+      <li>❤ 기회는 3번! <b class="red">3번째 틀리면 게임 끝</b></li>`,
+    start: "게임 시작", again: "다시 하기", mute: "소리 켜기/끄기",
+    hudScore: "점수", hudCombo: "콤보", hudLevel: "레벨", hudTime: "남은 시간",
+    finalScore: "최종 점수", avgRt: "평균 반응 시간",
+    rHits: "맞힌 점", rAcc: "정확도", rCombo: "최대 콤보", rSpecial: "황금 · 파란 점 / PERFECT",
+    rBestRt: "가장 빠른 반응", rWorstRt: "가장 느린 반응",
+    shareTitle: "📣 내 성적표 (친구에게 자랑하기)",
+    legend: () => `🟩 빠름 · 🟨 보통 · 🟧 느림 · 🟥 실수 · ⬛ 못 감<br>한 칸 = ${BLOCK_SECONDS}초 구간`,
+    shareBtn: "📤 공유하기", copyBtn: "📋 복사하기",
+    copied: "✅ 복사됐어요! 단톡방에 붙여넣기 하세요",
+    sharedFallback: "✅ 공유 창을 열 수 없어 대신 복사했어요. 붙여넣기 하세요",
+    copyFail: "복사가 안 됐어요. 위 이모지를 길게 눌러 복사하세요",
+    recordsTitle: "🏆 내 최고 기록", recordsEmpty: "아직 기록이 없어요. 첫 기록을 세워 보세요!",
+    rankNo: n => `${n}위`,
+    newBest: "🎉 최고 기록 갱신!",
+    endClear: () => `🏁 <b class="lime">${durKo()} 완주!</b>`,
+    endMiss: (time, lv) => `❌ <b class="red">${MAX_MISSES}번 틀려서 종료</b> · ${time} 버팀 (LEVEL ${lv})`,
+    blueIncoming: n => `◆ ${n} 콤보! 파란 점 등장 +${POINTS_BLUE}`,
+    offTarget: "빗나감", lastChance: "⚠ 한 번 더 틀리면 끝!",
+    sec: v => `${v}초`, minSec: (m, s) => `${m}분 ${s}초`,
+    shareStats: (avg, rank, pts) => `⚡ 평균 반응 ${avg} ${rank} · ${pts}점`,
+    sharePts: pts => `${pts}점`,
+  },
+  en: {
+    pageTitle: "Rhythm Dot Tap",
+    gameTitle: "🎯 Rhythm Dot Tap",
+    title: "Rhythm <em>Dot</em> Tap",
+    subtitle: () => `Tap the dots to the beat for ${durEn()} (${ROUND_SECONDS}s)`,
+    rules: () => `
+      <li>● Tap a <b class="mint">dot</b> for <b>+10</b></li>
+      <li>★ Every 5th dot is a <b class="gold">golden dot</b>: <b>+50</b></li>
+      <li>◆ Every ${BLUE_EVERY_COMBO} combo a <b class="blue">blue dot</b> appears: <b>+${POINTS_BLUE}</b></li>
+      <li>♪ Tap right on the <b class="lime">beat</b> for PERFECT <b>+5</b></li>
+      <li>⚡ Your <b>reaction time</b> is measured for every dot</li>
+      <li>⏱ Every 10s the dots get <b>smaller and faster</b> <span style="white-space:nowrap">(${LEVELS.length} levels)</span></li>
+      <li>🔥 Every 10 combo: score ×2, ×3, ×4</li>
+      <li>✕ Missing a dot or tapping empty space is a <b class="red">miss</b> (combo resets)</li>
+      <li>❤ 3 lives! <b class="red">The 3rd miss ends the game</b></li>`,
+    start: "Start", again: "Play again", mute: "Sound on/off",
+    hudScore: "Score", hudCombo: "Combo", hudLevel: "Level", hudTime: "Time",
+    finalScore: "Final score", avgRt: "Avg reaction",
+    rHits: "Hits", rAcc: "Accuracy", rCombo: "Max combo", rSpecial: "Gold · Blue / PERFECT",
+    rBestRt: "Fastest", rWorstRt: "Slowest",
+    shareTitle: "📣 Your score card — brag to friends",
+    legend: () => `🟩 fast · 🟨 ok · 🟧 slow · 🟥 miss · ⬛ not reached<br>1 square = ${BLOCK_SECONDS} seconds`,
+    shareBtn: "📤 Share", copyBtn: "📋 Copy",
+    copied: "✅ Copied! Paste it in your group chat",
+    sharedFallback: "✅ Sharing isn't available here, so we copied it instead",
+    copyFail: "Couldn't copy. Long-press the emoji above to copy",
+    recordsTitle: "🏆 My best scores", recordsEmpty: "No records yet. Set your first one!",
+    rankNo: n => `#${n}`,
+    newBest: "🎉 New best!",
+    endClear: () => `🏁 <b class="lime">All ${durEn()} cleared!</b>`,
+    endMiss: (time, lv) => `❌ <b class="red">Out after ${MAX_MISSES} misses</b> · lasted ${time} (LEVEL ${lv})`,
+    blueIncoming: n => `◆ ${n} combo! Blue dot +${POINTS_BLUE}`,
+    offTarget: "Off target", lastChance: "⚠ One more miss and it's over!",
+    sec: v => `${v}s`, minSec: (m, s) => `${m}m ${s}s`,
+    shareStats: (avg, rank, pts) => `⚡ Avg reaction ${avg} ${rank} · ${pts} pts`,
+    sharePts: pts => `${pts} pts`,
+  },
+};
+// 한 판 길이를 글자로: 120 → "2분" / "2 minutes", 90 → "1분 30초" / "90 seconds"
+function durKo() { const m = Math.floor(ROUND_SECONDS / 60), s = ROUND_SECONDS % 60; return m ? `${m}분${s ? ` ${s}초` : ""}` : `${s}초`; }
+function durEn() { return ROUND_SECONDS % 60 === 0 ? `${ROUND_SECONDS / 60} minute${ROUND_SECONDS === 60 ? "" : "s"}` : `${ROUND_SECONDS} seconds`; }
+const LANG_KEY = "dotRhythm.lang";
+let lang = (() => {
+  const q = (new URLSearchParams(location.search).get("lang") || "").toLowerCase();
+  if (q === "en" || q === "ko" || q === "kr") return q === "en" ? "en" : "ko";   // 주소 뒤 ?lang=en 으로 지정 가능
+  try { const saved = localStorage.getItem(LANG_KEY); if (saved === "en" || saved === "ko") return saved; } catch (e) {}
+  return (navigator.language || "").toLowerCase().startsWith("ko") ? "ko" : "en";  // 처음엔 브라우저 언어를 따라감
+})();
+function T(key, ...args) {
+  const v = (I18N[lang] || I18N.ko)[key];
+  return typeof v === "function" ? v(...args) : v;
+}
+
+/* ===================== 화면 준비 ===================== */
+const cvs = document.getElementById("c");
+const ctx = cvs.getContext("2d");
+let W = 0, H = 0, S = 1;         // S: 화면 크기에 따른 배율
+const TOP = 122;                 // 정보판 높이만큼 위쪽 여백
+
+function resize() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  W = innerWidth; H = innerHeight;
+  cvs.width = W * dpr; cvs.height = H * dpr;
+  cvs.style.width = W + "px"; cvs.style.height = H + "px";
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  S = Math.max(0.65, Math.min(1.2, Math.min(W, H) / 600));
+}
+addEventListener("resize", resize);
+resize();
+
+const $ = id => document.getElementById(id);
+const rand = (a, b) => a + Math.random() * (b - a);
+
+/* ===================== 소리 (Web Audio) ===================== */
+let actx = null, muted = false;
+function initAudio() {
+  if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
+  if (actx && actx.state === "suspended") actx.resume();
+}
+function tone(freq, dur, type = "sine", vol = 0.15, slideTo = null) {
+  if (!actx || muted) return;
+  const o = actx.createOscillator(), g = actx.createGain(), now = actx.currentTime;
+  o.type = type; o.frequency.setValueAtTime(freq, now);
+  if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, now + dur);
+  g.gain.setValueAtTime(vol, now);
+  g.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+  o.connect(g).connect(actx.destination);
+  o.start(now); o.stop(now + dur + 0.02);
+}
+const sfx = {
+  beat:    (strong) => tone(strong ? 140 : 110, 0.12, "sine", strong ? 0.22 : 0.12, 45),
+  hit:     () => tone(660, 0.09, "triangle", 0.16),
+  perfect: () => { tone(880, 0.1, "triangle", 0.14); tone(1320, 0.12, "sine", 0.08); },
+  special: () => { tone(784, 0.14, "triangle", 0.15); setTimeout(() => tone(1175, 0.18, "triangle", 0.13), 70); },
+  blue:    () => { [988, 1319, 1760].forEach((f, i) => setTimeout(() => tone(f, 0.16, "triangle", 0.13), i * 60)); },
+  miss:    () => tone(180, 0.15, "sawtooth", 0.06, 90),
+  level:   () => { [523, 659, 784].forEach((f, i) => setTimeout(() => tone(f, 0.12, "square", 0.05), i * 80)); },
+};
+$("muteBtn").addEventListener("click", () => {
+  muted = !muted; $("muteBtn").textContent = muted ? "🔇" : "🔊";
+});
+
+/* ===================== 기록 저장 (이 브라우저에 보관) ===================== */
+function loadRecords() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; } catch (e) { return []; }
+}
+function saveRecord(rec) {
+  const list = loadRecords();
+  list.push(rec);
+  list.sort((a, b) => b.score - a.score);
+  const top = list.slice(0, 10);
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(top)); } catch (e) {}
+  return top;
+}
+function renderRecords(el, list, myId) {
+  const items = list.slice(0, 5).map((r, i) =>
+    `<li class="${r.id === myId ? "me" : ""}"><span>${T("rankNo", i + 1)} · ${r.date}${r.avgRt ? `<small>⚡${fmtRt(r.avgRt)}</small>` : ""}</span><b>${r.score.toLocaleString()}</b></li>`
+  ).join("");
+  el.innerHTML = `<h3>${T("recordsTitle")}</h3>` +
+    (items ? `<ol>${items}</ol>` : `<div class="empty">${T("recordsEmpty")}</div>`);
+}
+function nowLabel() {
+  const d = new Date(), p = n => String(n).padStart(2, "0");
+  return `${p(d.getMonth() + 1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+/* ===================== 게임 상태 ===================== */
+let state = "ready";             // ready | count | play | over
+let t = 0, countT = 0;
+let score = 0, combo = 0, maxCombo = 0, hits = 0, misses = 0, specials = 0, perfects = 0;
+let blues = 0, blueNext = false;   // 맞힌 파란 점 수 / 다음 점을 파란 점으로 낼지
+let spawnCount = 0, level = 0;
+let dot = null;
+let particles = [], popups = [], ripples = [];
+let beatAcc = 0, beatNo = 0, pulse = 0;
+let flash = 0;                   // 틀렸을 때 화면이 붉게 번쩍
+let reactions = [];              // 맞힌 점마다 { t: 게임 시각, rt: 반응 시간(초) }
+let missTimes = [];              // 틀린 순간의 게임 시각
+
+function L() { return LEVELS[level]; }
+function levelMsg(i) { return lang === "en" ? LEVELS[i].msgEn : LEVELS[i].msg; }
+
+/* 반응 시간을 0.01초 단위로: 0.4567 → "0.46초" */
+function fmtRt(sec) { return T("sec", sec.toFixed(2)); }
+function round2(sec) { return Math.round(sec * 100) / 100; }
+
+function resetGame() {
+  reactions = []; missTimes = [];
+  t = 0; score = 0; combo = 0; maxCombo = 0; hits = 0; misses = 0; specials = 0; perfects = 0;
+  blues = 0; blueNext = false;
+  spawnCount = 0; level = 0; dot = null;
+  particles = []; popups = []; ripples = [];
+  beatAcc = 0; beatNo = 0; pulse = 0; flash = 0;
+  updateHud();
+}
+
+function spawn() {
+  spawnCount++;
+  const lv = L();
+  const blue = blueNext;           // 30콤보 보상: 파란 점 (황금 점보다 우선)
+  blueNext = false;
+  const special = !blue && spawnCount % SPECIAL_EVERY === 0;
+  const r = lv.r * S * (special ? 0.9 : 1);
+  const pad = r + 8;
+  const x = W - pad > pad ? rand(pad, W - pad) : W / 2;
+  const y = H - pad > TOP + r ? rand(TOP + r, H - pad) : (TOP + H) / 2;
+  const ang = Math.random() * Math.PI * 2;
+  const sp = lv.speed * S * (special ? 1.25 : blue ? 1.15 : 1);
+  dot = { x, y, r, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp,
+          life: lv.life * (special ? 0.85 : 1), age: 0, special, blue, pop: 0,
+          bornAt: performance.now(), shownAt: 0 };   // shownAt: 화면에 처음 그려진 시각
+}
+
+/* ===================== 박자 ===================== */
+function onBeat() {
+  beatNo++;
+  const strong = beatNo % 4 === 1;
+  sfx.beat(strong);
+  ripples.push({ x: W / 2, y: (TOP + H) / 2, r: 20, a: strong ? 0.35 : 0.18 });
+  // 레벨 4부터는 박자 두 번마다 점이 방향을 휙 바꿈
+  if (dot && level >= 3 && beatNo % 2 === 0) {
+    const sp = Math.hypot(dot.vx, dot.vy);
+    const ang = Math.atan2(dot.vy, dot.vx) + rand(-1.2, 1.2);
+    dot.vx = Math.cos(ang) * sp; dot.vy = Math.sin(ang) * sp;
+  }
+}
+function beatInterval() { return 60 / L().bpm; }
+function isPerfect() {
+  const iv = beatInterval();
+  return beatAcc < PERFECT_WINDOW || iv - beatAcc < PERFECT_WINDOW;
+}
+
+/* ===================== 입력 ===================== */
+cvs.addEventListener("pointerdown", e => {
+  if (state !== "play") return;
+  const x = e.clientX, y = e.clientY;
+  if (dot && Math.hypot(x - dot.x, y - dot.y) <= dot.r * 1.15) {
+    hitDot(x, y, performance.now());
+  } else {
+    // 빈 곳을 누르면 틀림
+    ripples.push({ x, y, r: 6, a: 0.5, color: "255,93,115", small: true });
+    registerMiss(x, y, T("offTarget"));
+  }
+});
+
+function hitDot(x, y, clickAt) {
+  const d = dot;
+  // 반응 시간: 점이 화면에 처음 그려진 순간 → 클릭한 순간 (0.01초 단위)
+  const shownAt = d.shownAt || d.bornAt;
+  const rt = round2(Math.min(d.life, Math.max(0, (clickAt - shownAt) / 1000)));
+  reactions.push({ t, rt });
+  combo++; hits++;
+  if (combo > maxCombo) maxCombo = combo;
+  const mult = Math.min(4, 1 + Math.floor((combo - 1) / 10));
+  const perfect = isPerfect();
+  const base = d.blue ? POINTS_BLUE : d.special ? POINTS_SPECIAL : POINTS_NORMAL;
+  let pts = base * mult;
+  if (perfect) { pts += POINTS_PERFECT; perfects++; }
+  score += pts;
+  if (d.special) specials++;
+  if (d.blue) blues++;
+
+  const color = d.blue ? "#4aa8ff" : d.special ? "#ffc84a" : "#3ee6c1";
+  const big = d.blue || d.special;
+  addPopup(d.x, d.y - d.r - 6, `+${pts}${mult > 1 ? ` ×${mult}` : ""}`, color, d.blue ? 28 : big ? 24 : 18);
+  if (perfect) addPopup(d.x, d.y + d.r + 18, "PERFECT!", "#c6f432", 15);
+  addPopup(d.x, d.y + d.r + (perfect ? 38 : 18), `⚡ ${fmtRt(rt)}`, "#eef1ff", 14);
+  burst(d.x, d.y, color, d.blue ? 40 : d.special ? 28 : 14);
+  if (d.blue) sfx.blue(); else if (d.special) sfx.special(); else if (perfect) sfx.perfect(); else sfx.hit();
+
+  // 콤보 30, 60, 90...에 도달하면 다음 점은 파란 점
+  if (combo % BLUE_EVERY_COMBO === 0) { blueNext = true; showToast(T("blueIncoming", combo), "#4aa8ff"); }
+  spawn();
+  updateHud();
+}
+
+/* ===================== 효과 ===================== */
+function addPopup(x, y, text, color, size) {
+  x = Math.max(50, Math.min(W - 50, x));   // 글자가 화면 밖으로 잘리지 않게
+  popups.push({ x, y, text, color, size, age: 0 });
+}
+function burst(x, y, color, n) {
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2, s = rand(80, 260) * S;
+    particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, age: 0, life: rand(0.35, 0.7), color, size: rand(2, 5) });
+  }
+}
+
+/* ===================== 진행 ===================== */
+function startGame() {
+  initAudio();
+  resetGame();
+  $("startScreen").classList.add("hidden");
+  $("endScreen").classList.add("hidden");
+  state = "count"; countT = 3;
+  document.body.classList.add("playing");
+  $("countdown").style.display = "flex";
+}
+
+function showToast(msg, color) {
+  const el = $("toast");
+  el.textContent = msg;
+  el.style.color = color || "";
+  el.classList.remove("show"); void el.offsetWidth; el.classList.add("show");
+}
+
+/* 틀렸을 때: 콤보 끊김 + 기회 하나 차감, 3번째면 게임 끝 */
+function registerMiss(x, y, label) {
+  combo = 0; misses++;
+  missTimes.push(t);
+  addPopup(x, y, `${label} (${misses}/${MAX_MISSES})`, "#ff5d73", 17);
+  flash = 1; sfx.miss();
+  const lv = $("lives"); lv.classList.remove("warn"); void lv.offsetWidth; lv.classList.add("warn");
+  updateHud();
+  if (misses >= MAX_MISSES) { endGame("miss"); return; }
+  if (misses === MAX_MISSES - 1) showToast(T("lastChance"));
+}
+
+function fmtTime(sec) {
+  const m = Math.floor(sec / 60), s = Math.floor(sec % 60);
+  return m > 0 ? T("minSec", m, s) : T("sec", s);
+}
+
+let lastResult = null;           // 마지막 판 결과 (언어를 바꾸면 이걸로 다시 그림)
+
+function endGame(reason) {
+  if (state === "over") return;
+  state = "over"; dot = null;
+  document.body.classList.remove("playing");
+  const id = Date.now();
+  const prevBest = (loadRecords()[0] || { score: 0 }).score;
+  const rts = reactions.map(r => r.rt);
+  const avgRt = rts.length ? round2(rts.reduce((a, b) => a + b, 0) / rts.length) : 0;
+  const list = saveRecord({ id, score, date: nowLabel(), maxCombo, avgRt });
+  lastResult = {
+    id, list, reason, time: t, level: level + 1, score, hits, misses, maxCombo, specials, blues, perfects,
+    avgRt, bestRt: rts.length ? Math.min(...rts) : 0, worstRt: rts.length ? Math.max(...rts) : 0,
+    newBest: score > prevBest && score > 0, line: emojiLine(),
+  };
+  renderEnd();
+  $("shareMsg").textContent = "";
+  setTimeout(() => $("endScreen").classList.remove("hidden"), reason === "miss" ? 900 : 500);
+  tone(523, 0.2, "triangle", 0.12); setTimeout(() => tone(392, 0.35, "triangle", 0.12), 160);
+}
+
+/* 결과 화면 그리기 (현재 언어로) */
+function renderEnd() {
+  const r = lastResult;
+  if (!r) return;
+  const total = r.hits + r.misses;
+  const rank = r.avgRt ? rankOf(r.avgRt) : "";
+  $("endReason").innerHTML = r.reason === "clear" ? T("endClear") : T("endMiss", fmtTime(r.time), r.level);
+  $("finalScore").textContent = r.score.toLocaleString();
+  $("bestBadge").innerHTML = r.newBest ? `<span class="newbest">${T("newBest")}</span>` : "";
+  $("rAvgRt").textContent = r.avgRt ? fmtRt(r.avgRt) : "–";
+  $("rRank").textContent = rank;
+  $("rRank").style.display = rank ? "" : "none";
+  $("rHits").textContent = r.hits;
+  $("rAcc").textContent = (total ? Math.round(r.hits / total * 100) : 0) + "%";
+  $("rCombo").textContent = r.maxCombo;
+  $("rSpecial").textContent = `${r.specials} · ${r.blues || 0} / ${r.perfects}`;
+  $("rBestRt").textContent = r.bestRt ? fmtRt(r.bestRt) : "–";
+  $("rWorstRt").textContent = r.worstRt ? fmtRt(r.worstRt) : "–";
+  $("shareEmoji").textContent = r.line;
+  renderRecords($("endRecords"), r.list, r.id);
+}
+
+/* ===================== 이모지 성적표 ===================== */
+function rankOf(avg) { return RT_RANKS.find(r => avg < r.max)[lang]; }
+
+// BLOCK_SECONDS(15초) 구간마다 한 칸: 실수가 있었으면 🟥, 아니면 그 구간 평균 반응 시간으로 🟩🟨🟧, 못 간 구간은 ⬛
+function emojiLine() {
+  const n = Math.ceil(ROUND_SECONDS / BLOCK_SECONDS);
+  const reached = Math.floor(Math.min(t, ROUND_SECONDS - 0.001) / BLOCK_SECONDS);
+  let out = "";
+  for (let i = 0; i < n; i++) {
+    const inBlock = x => Math.min(n - 1, Math.floor(x / BLOCK_SECONDS)) === i;
+    const blockRts = reactions.filter(r => inBlock(r.t)).map(r => r.rt);
+    if (i > reached) out += "⬛";
+    else if (missTimes.some(inBlock)) out += "🟥";
+    else if (!blockRts.length) out += "⬛";
+    else {
+      const avg = blockRts.reduce((a, b) => a + b, 0) / blockRts.length;
+      out += avg < RT_FAST ? "🟩" : avg < RT_OK ? "🟨" : "🟧";
+    }
+  }
+  return out;
+}
+
+function shareUrl() {
+  return SHARE_URL || (location.protocol.startsWith("http") ? location.origin + location.pathname : "");
+}
+
+// 공유/복사되는 글 (현재 언어로 만듦)
+function buildShareText() {
+  const r = lastResult;
+  if (!r) return "";
+  const d = new Date();
+  const date = `${d.getMonth() + 1}/${d.getDate()}`;
+  const pts = r.score.toLocaleString();
+  const stats = r.avgRt ? T("shareStats", fmtRt(r.avgRt), rankOf(r.avgRt), pts) : T("sharePts", pts);
+  return [`${T("gameTitle")} ${date}`, r.line, stats, shareUrl()].filter(Boolean).join("\n");
+}
+
+async function copyText(text) {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch (e) {}
+  // 예전 브라우저나 파일로 직접 연 경우를 위한 대체 방법
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "");
+    ta.style.cssText = "position:fixed;top:0;left:0;opacity:0;user-select:text;-webkit-user-select:text";
+    document.body.appendChild(ta);
+    ta.select(); ta.setSelectionRange(0, text.length);
+    const ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    return ok;
+  } catch (e) { return false; }
+}
+
+let msgTimer = 0;
+function shareMessage(key, btn) {
+  $("shareMsg").textContent = T(key);
+  if (btn) btn.classList.add("done");
+  clearTimeout(msgTimer);
+  msgTimer = setTimeout(() => {
+    $("shareMsg").textContent = "";
+    $("copyBtn").classList.remove("done");
+  }, 3000);
+}
+
+// 📋 복사하기
+$("copyBtn").addEventListener("click", async () => {
+  const ok = await copyText(buildShareText());
+  shareMessage(ok ? "copied" : "copyFail", ok ? $("copyBtn") : null);
+});
+
+// 📤 공유하기: 휴대폰이면 카카오톡·문자·X 등 공유 창이 열리고, 안 되는 곳에서는 자동으로 복사
+$("shareBtn").addEventListener("click", async () => {
+  const text = buildShareText();
+  if (navigator.share) {
+    try {
+      await navigator.share({ title: T("pageTitle"), text });
+      return;
+    } catch (e) {
+      if (e && e.name === "AbortError") return;   // 사용자가 공유 창을 닫음
+    }
+  }
+  const ok = await copyText(text);
+  shareMessage(ok ? "sharedFallback" : "copyFail", ok ? $("copyBtn") : null);
+});
+
+/* ===================== 언어 적용 ===================== */
+function applyLang() {
+  document.documentElement.lang = lang;
+  document.title = T("pageTitle");
+  document.querySelectorAll("[data-i18n]").forEach(el => { el.textContent = T(el.dataset.i18n); });
+  document.querySelectorAll("[data-i18n-html]").forEach(el => { el.innerHTML = T(el.dataset.i18nHtml); });
+  $("muteBtn").title = T("mute");
+  document.querySelectorAll("#langSwitch button").forEach(b => b.classList.toggle("on", b.dataset.lang === lang));
+  renderRecords($("startRecords"), loadRecords());
+  renderEnd();
+  $("shareMsg").textContent = "";
+}
+document.querySelectorAll("#langSwitch button").forEach(b => b.addEventListener("click", () => {
+  lang = b.dataset.lang;
+  try { localStorage.setItem(LANG_KEY, lang); } catch (e) {}
+  applyLang();
+}));
+
+function updateHud() {
+  $("scoreEl").textContent = score.toLocaleString();
+  const mult = Math.min(4, 1 + Math.floor(Math.max(0, combo - 1) / 10));
+  $("comboEl").textContent = combo + (combo > 10 ? ` ×${mult}` : "");
+  $("levelEl").textContent = level + 1;
+  const left = Math.max(0, ROUND_SECONDS - t);
+  $("timeEl").textContent = Math.ceil(left);
+  $("timefill").style.transform = `scaleX(${left / ROUND_SECONDS})`;
+  let hearts = "";
+  for (let i = 0; i < MAX_MISSES; i++) hearts += `<span class="${i < MAX_MISSES - misses ? "on" : "off"}">♥</span>`;
+  $("lives").innerHTML = hearts;
+}
+
+function update(dt) {
+  // 카운트다운 (3, 2, 1)
+  if (state === "count") {
+    const before = Math.ceil(countT);
+    countT -= dt;
+    const now = Math.ceil(countT);
+    $("countdown").textContent = now > 0 ? now : "GO!";
+    if (now !== before && now > 0) tone(440, 0.1, "square", 0.06);
+    if (countT <= -0.4) {
+      $("countdown").style.display = "none";
+      state = "play"; spawn(); showToast(levelMsg(0)); onBeat();
+    } else if (now <= 0 && before > 0) tone(880, 0.15, "square", 0.07);
+  }
+
+  if (state === "play") {
+    t += dt;
+    // 10초마다 레벨 상승
+    const newLevel = Math.min(LEVELS.length - 1, Math.floor(t / LEVEL_SECONDS));
+    if (newLevel !== level) { level = newLevel; showToast(levelMsg(level)); sfx.level(); }
+
+    // 박자
+    beatAcc += dt;
+    const iv = beatInterval();
+    if (beatAcc >= iv) { beatAcc -= iv; onBeat(); }
+    pulse = Math.exp(-beatAcc * 9);
+
+    // 점 움직임: 박자마다 앞으로 '툭' 튀어나가듯 움직임
+    if (dot) {
+      dot.age += dt;
+      const surge = 0.55 + pulse * 1.3;
+      dot.x += dot.vx * dt * surge;
+      dot.y += dot.vy * dt * surge;
+      if (dot.x < dot.r) { dot.x = dot.r; dot.vx = Math.abs(dot.vx); }
+      if (dot.x > W - dot.r) { dot.x = W - dot.r; dot.vx = -Math.abs(dot.vx); }
+      if (dot.y < TOP + dot.r) { dot.y = TOP + dot.r; dot.vy = Math.abs(dot.vy); }
+      if (dot.y > H - dot.r) { dot.y = H - dot.r; dot.vy = -Math.abs(dot.vy); }
+      if (dot.age >= dot.life) {   // 시간 안에 못 누름
+        registerMiss(dot.x, dot.y, "MISS");
+        if (state === "play") spawn();
+      }
+    }
+    if (state === "play" && t >= ROUND_SECONDS) { t = ROUND_SECONDS; endGame("clear"); }
+    updateHud();
+  } else if (state === "over" || state === "ready") {
+    pulse *= Math.exp(-dt * 6);
+  }
+  flash = Math.max(0, flash - dt * 2.5);
+
+  // 효과 갱신
+  particles.forEach(p => { p.age += dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 0.92; p.vy *= 0.92; });
+  particles = particles.filter(p => p.age < p.life);
+  popups.forEach(p => { p.age += dt; p.y -= 40 * dt; });
+  popups = popups.filter(p => p.age < 0.8);
+  ripples.forEach(r => { r.r += (r.small ? 120 : 520) * dt; r.a -= (r.small ? 1.4 : 0.45) * dt; });
+  ripples = ripples.filter(r => r.a > 0);
+}
+
+/* ===================== 그리기 ===================== */
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+
+  // 배경: 레벨이 오를수록 살짝 붉어지는 빛 + 박자 파동
+  const hue = 235 - level * (170 / (LEVELS.length - 1));   // 레벨이 오를수록 남색 → 붉은빛
+  const g = ctx.createRadialGradient(W / 2, (TOP + H) / 2, 0, W / 2, (TOP + H) / 2, Math.max(W, H) * 0.7);
+  g.addColorStop(0, `hsla(${hue},60%,${18 + pulse * 6}%,1)`);
+  g.addColorStop(1, "#0e1124");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+
+  ripples.forEach(r => {
+    ctx.beginPath(); ctx.arc(r.x, r.y, r.r, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(${r.color || "62,230,193"},${Math.max(0, r.a)})`;
+    ctx.lineWidth = r.small ? 2 : 3; ctx.stroke();
+  });
+
+  if (dot) drawDot(dot);
+
+  particles.forEach(p => {
+    ctx.globalAlpha = 1 - p.age / p.life;
+    ctx.fillStyle = p.color;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fill();
+  });
+  ctx.globalAlpha = 1;
+
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  popups.forEach(p => {
+    ctx.globalAlpha = 1 - p.age / 0.8;
+    ctx.font = `800 ${p.size}px "Pretendard","Malgun Gothic",sans-serif`;
+    ctx.fillStyle = p.color; ctx.fillText(p.text, p.x, p.y);
+  });
+  ctx.globalAlpha = 1;
+
+  if (flash > 0) {   // 틀렸을 때 붉은 번쩍임
+    ctx.fillStyle = `rgba(255,93,115,${flash * 0.22})`;
+    ctx.fillRect(0, 0, W, H);
+  }
+}
+
+function drawDot(d) {
+  if (!d.shownAt) d.shownAt = performance.now();      // 반응 시간 측정 시작점
+  const appear = Math.min(1, d.age / 0.12);           // 나타날 때 톡 커지는 효과
+  const r = d.r * appear * (1 + pulse * 0.12);          // 박자에 맞춰 두근두근
+  const left = 1 - d.age / d.life;                       // 남은 시간 비율
+  const main = d.blue ? "#4aa8ff" : d.special ? "#ffc84a" : "#3ee6c1";
+
+  // 빛 번짐
+  ctx.save();
+  ctx.shadowColor = main; ctx.shadowBlur = d.blue ? 40 : d.special ? 34 : 20;
+  const grad = ctx.createRadialGradient(d.x - r * 0.3, d.y - r * 0.3, r * 0.1, d.x, d.y, r);
+  grad.addColorStop(0, "#ffffff");
+  grad.addColorStop(0.35, main);
+  grad.addColorStop(1, d.blue ? "#1f5fd1" : d.special ? "#d98a00" : "#1a9e86");
+  ctx.fillStyle = grad;
+  ctx.beginPath(); ctx.arc(d.x, d.y, r, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+
+  // 남은 시간 테두리 (줄어드는 원호)
+  ctx.beginPath();
+  ctx.arc(d.x, d.y, r + 6, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * left);
+  ctx.strokeStyle = left < 0.3 ? "#ff5d73" : "rgba(255,255,255,.75)";
+  ctx.lineWidth = 3; ctx.lineCap = "round"; ctx.stroke();
+
+  // 파란 점 표시 (◆)
+  if (d.blue) {
+    ctx.fillStyle = "#0a1f4d";
+    ctx.font = `900 ${Math.round(r * 0.95)}px sans-serif`;
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText("◆", d.x, d.y + r * 0.04);
+  }
+
+  // 황금 점 표시
+  if (d.special) {
+    ctx.fillStyle = "#3a2600";
+    ctx.font = `900 ${Math.round(r * 0.9)}px sans-serif`;
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText("★", d.x, d.y + r * 0.04);
+  }
+}
+
+/* ===================== 메인 루프 ===================== */
+let last = performance.now();
+function loop(now) {
+  const dt = Math.min(0.05, (now - last) / 1000);   // 탭을 벗어나도 시간이 튀지 않게
+  last = now;
+  update(dt); draw();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+$("startBtn").addEventListener("click", startGame);
+$("againBtn").addEventListener("click", startGame);
+applyLang();
+updateHud();
+</script>
+</body>
+</html>
