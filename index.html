@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>리듬 점 클릭</title>
+<title>점빵</title>
 <style>
   :root{
     --bg:#f6f7fb; --panel:#ffffff; --line:#e1e4ef; --soft:#f1f3f9;
@@ -127,6 +127,55 @@
   #sharePanel .tip{font-size:12px;color:var(--muted);margin-top:10px;line-height:1.5}
   #sharePanel .close{display:block;width:100%;margin-top:10px;border:0;background:none;color:var(--muted);
     font-weight:600;font-size:14px;font-family:inherit;padding:8px;cursor:pointer}
+  /* ---------- 랭킹 ---------- */
+  .card,.sheet{touch-action:pan-y}
+  #rankBox{background:linear-gradient(180deg,#fff8e1,#fff);border:1px solid #f1dfa0;border-radius:14px;
+    padding:12px;margin:12px 0 4px;text-align:center}
+  #rankBox[hidden],#startRank[hidden],#roomArea[hidden]{display:none}
+  #rankBox h3{font-size:13px;color:var(--muted);font-weight:600;margin-bottom:6px}
+  .rk-main{font-size:18px;font-weight:800}
+  .rk-main b{color:var(--gold-ink);font-size:28px;font-variant-numeric:tabular-nums}
+  .rk-room{font-size:15px;font-weight:800;color:var(--blue-ink);margin-top:2px}
+  .rk-sub{font-size:12px;color:var(--muted);margin-top:4px}
+  .rk-err{font-size:13px;color:var(--red);margin:4px 0}
+  .rk-form{display:flex;gap:6px;margin-top:4px}
+  .rk-form input{flex:1;min-width:0;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:16px;
+    font-family:inherit;color:var(--ink);background:#fff;user-select:text;-webkit-user-select:text}
+  .rk-form input:focus{outline:2px solid var(--mint);border-color:transparent}
+  .rk-hint{font-size:11px;color:var(--muted);margin-top:6px}
+  .rk-actions{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-top:8px;align-items:center}
+  .btn.sm{width:auto;display:inline-block;font-size:14px;padding:9px 14px;border-radius:12px;margin-top:0}
+  .linkbtn{border:0;background:none;color:var(--muted);font-family:inherit;font-size:12px;text-decoration:underline;cursor:pointer;padding:4px}
+  .room-banner{background:#eef5ff;border:1px solid #cfe1ff;border-radius:14px;padding:10px 12px;margin:0 0 4px;text-align:center}
+  .room-banner b{color:var(--blue-ink);font-size:15px}
+  .room-banner p{font-size:12px;color:var(--muted);margin-top:2px}
+  #startRank{margin:-4px 0 14px}
+  #roomArea .btn{margin-top:8px;width:100%;font-size:14px;padding:11px}
+  /* 순위표 패널 */
+  #boardPanel{position:fixed;inset:0;z-index:8;display:flex;align-items:flex-end;justify-content:center;
+    background:rgba(27,31,59,.35);padding:12px}
+  #boardPanel.hidden{display:none}
+  #boardPanel .sheet{width:100%;max-width:420px;background:#fff;border-radius:20px;padding:14px 14px 10px;
+    box-shadow:0 -8px 40px rgba(30,40,90,.2);animation:sheetUp .25s ease-out;max-height:92vh;display:flex;flex-direction:column}
+  .bp-tabs{display:flex;gap:4px;background:var(--soft);border-radius:12px;padding:4px;margin-bottom:10px}
+  .bp-tabs button{flex:1;border:0;background:none;padding:9px 6px;border-radius:9px;font-weight:800;font-size:14px;
+    color:var(--muted);cursor:pointer;font-family:inherit}
+  .bp-tabs button.on{background:#fff;color:var(--ink);box-shadow:0 1px 4px rgba(30,40,90,.12)}
+  #bpBody{overflow:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y;min-height:120px}
+  #bpBody ol{list-style:none}
+  #bpBody li{display:grid;grid-template-columns:34px 1fr auto;align-items:center;gap:8px;padding:8px 6px;border-radius:10px}
+  #bpBody li:nth-child(odd){background:var(--soft)}
+  #bpBody li.me{background:rgba(62,230,193,.24)}
+  #bpBody .n{font-weight:900;text-align:center;font-size:15px}
+  #bpBody .who{min-width:0;text-align:left}
+  #bpBody .who span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:700;font-size:14px}
+  #bpBody .who small{color:var(--muted);font-size:11px}
+  #bpBody li b{font-variant-numeric:tabular-nums;font-size:15px}
+  #bpBody .gap{display:block;text-align:center;color:var(--muted);background:none!important;padding:0;line-height:1}
+  .bp-msg{text-align:center;color:var(--muted);padding:28px 0;font-size:14px}
+  .bp-foot{font-size:12px;color:var(--muted);text-align:center;margin-top:8px}
+  #boardPanel .close{display:block;width:100%;margin-top:6px;border:0;background:none;color:var(--muted);
+    font-weight:600;font-size:14px;font-family:inherit;padding:8px;cursor:pointer}
   @media (max-width:520px){              /* 좁은 화면: 점수판이 소리 버튼과 겹치지 않게 */
     #hud{padding-right:54px}
     #stats{gap:6px}
@@ -190,7 +239,7 @@
 <!-- 시작 화면 -->
 <div class="overlay" id="startScreen">
   <div class="card">
-    <h1 data-i18n-html="title">리듬 <em>점</em> 클릭</h1>
+    <h1 data-i18n-html="title"><em>점</em>빵</h1>
     <p class="sub" data-i18n="subtitle">2분(120초) 동안 박자에 맞춰 점을 눌러 보세요</p>
     <ul class="rules" data-i18n-html="rules">
       <li>● 화면에 나타난 <b class="mint">점</b>을 누르면 <b>+10점</b></li>
@@ -203,6 +252,7 @@
       <li>❤ 기회는 3번! <b class="red">3번째 틀리면 게임 끝</b></li>
     </ul>
     <div class="records" id="startRecords"></div>
+    <div id="startRank" hidden></div>
     <button class="btn" id="startBtn" data-i18n="start">게임 시작</button>
   </div>
 </div>
@@ -236,6 +286,16 @@
   </div>
 </div>
 
+<!-- 순위표 패널 -->
+<div id="boardPanel" class="hidden">
+  <div class="sheet" role="dialog" aria-modal="true">
+    <div class="bp-tabs" id="bpTabs"></div>
+    <div id="bpBody"></div>
+    <div class="bp-foot" id="bpFoot"></div>
+    <button class="close" id="bpClose" data-i18n="panelClose">닫기</button>
+  </div>
+</div>
+
 <!-- 결과 화면 -->
 <div class="overlay hidden" id="endScreen">
   <div class="card">
@@ -243,6 +303,7 @@
     <div class="big" id="finalScore">0</div>
     <div class="reason" id="endReason"></div>
     <div id="bestBadge"></div>
+    <div id="rankBox" hidden></div>
     <div class="rt-line">⚡ <span data-i18n="avgRt">평균 반응 시간</span> <b id="rAvgRt">–</b><span class="rt-rank" id="rRank"></span></div>
     <div class="grid">
       <div><span data-i18n="rHits">맞힌 점</span><b id="rHits">0</b></div>
@@ -261,6 +322,7 @@
         <button class="btn ghost" id="copyBtn" data-i18n="copyBtn">📋 복사하기</button>
       </div>
       <div class="share-msg" id="shareMsg"></div>
+      <div id="roomArea" hidden></div>
     </div>
     <div class="records" id="endRecords"></div>
     <button class="btn" id="againBtn" data-i18n="again">다시 하기</button>
@@ -306,15 +368,18 @@ const RT_RANKS = [               // 평균 반응 시간에 따른 칭호
   { max: 99,   ko: "🐢 거북이급", en: "🐢 Turtle" },
 ];
 const THANKS_SECONDS = 3.5;      // 완주 축하(강아지) 화면을 몇 초 보여 줄지 (누르면 바로 넘어감)
+/* ----- 랭킹 (Supabase) — 두 칸을 채우면 랭킹이 켜집니다. 비워 두면 랭킹 없이 지금처럼 동작 ----- */
+const SUPABASE_URL = "https://vdcnfooyuiippohwdgll.supabase.co";
+const SUPABASE_KEY = "sb_publishable__tBsFW4dNmz-bVTZ3Bh0IQ_Sz2L2hsp";   // Publishable key (sb_publishable_...) 또는 anon public key. ※ secret / service_role 키는 절대 넣지 마세요
 const SHARE_URL = "";            // 홈페이지에 올린 뒤 게임 주소를 넣으세요. 비워 두면 현재 주소(http/https일 때만)를 씁니다.
 
 /* ===================== 언어 (EN / KR) ===================== */
 // 글자를 고치려면 여기만 바꾸면 됩니다. ko = 한국어, en = 영어
 const I18N = {
   ko: {
-    pageTitle: "리듬 점 클릭",
-    gameTitle: "🎯 리듬 점 클릭",
-    title: "리듬 <em>점</em> 클릭",
+    pageTitle: "점빵",
+    gameTitle: "🎯 점빵",
+    title: "<em>점</em>빵",
     subtitle: () => `${durKo()}(${ROUND_SECONDS}초) 동안 박자에 맞춰 점을 눌러 보세요`,
     rules: () => `
       <li>● 화면에 나타난 <b class="mint">점</b>을 누르면 <b>+10점</b></li>
@@ -339,6 +404,33 @@ const I18N = {
     sharedFallback: "✅ 공유 창을 열 수 없어 대신 복사했어요. 붙여넣기 하세요",
     copyFail: "복사가 안 됐어요. 위 이모지를 길게 눌러 복사하세요",
     panelTitle: "📤 결과 공유하기", panelCopy: "📋 복사하기", panelClose: "닫기",
+    rkTitle: "🏆 오늘의 랭킹", rkNickPh: "닉네임 (12자까지)", rkSubmit: "등록",
+    rkNickHint: "가입 없이 닉네임만! 다음 판부터는 자동으로 등록돼요",
+    rkSending: "랭킹 등록 중…", rkRetry: "다시 시도", rkViewBoard: "순위표 보기",
+    rkToday: (n, t) => `오늘 <b>${n}</b>등 <small>/ ${t.toLocaleString()}명</small>`,
+    rkRoom: (n, t) => `⚔️ 대결방 ${n}등 / ${t}명`,
+    rkBestNote: b => `오늘 내 최고 기록 ${b.toLocaleString()}점 기준이에요`,
+    rkNickChange: "닉네임 바꾸기", rkNickSaved: "다음 판부터 바뀐 닉네임으로 보여요",
+    rkSkip: "점을 하나라도 맞히면 랭킹에 올라가요",
+    rkErr_nickname: "닉네임은 한글·영문·숫자로 12자까지 쓸 수 있어요",
+    rkErr_nickname_bad: "그 닉네임은 쓸 수 없어요",
+    rkErr_invalid: "기록을 확인할 수 없어 랭킹에 올리지 못했어요",
+    rkErr_too_soon: "잠시 후 다시 시도해 주세요", rkErr_too_many: "잠시 후 다시 시도해 주세요",
+    rkErr_limit: "오늘 등록할 수 있는 횟수를 다 썼어요",
+    rkErr_room: "대결방 주소가 올바르지 않아요",
+    rkErr_network: "랭킹 서버에 연결할 수 없어요",
+    shareRankToday: (n, t) => `🏆 오늘 ${n}등 / ${t.toLocaleString()}명`,
+    shareRankRoom: (n, t) => `⚔️ 대결방 ${n}등 / ${t}명`,
+    bpToday: "🏆 오늘의 랭킹", bpRoom: "⚔️ 대결방", bpLoading: "불러오는 중…",
+    bpEmpty: "아직 기록이 없어요. 첫 1등이 되어 보세요!",
+    bpTodayFoot: t => `오늘 ${t.toLocaleString()}명 참여 · 매일 자정(한국 시간)에 새로 시작`,
+    bpRoomFoot: (t, c) => `대결방 #${c} · ${t}명 참여`,
+    roomBanner: c => `⚔️ 대결방 #${c}`, roomBannerSub: "이 링크로 들어온 친구들끼리 순위를 겨뤄요",
+    roomBoard: "방 순위", roomInvite: "친구 초대", roomLeave: "방 나가기",
+    rkTodayBoard: "🏆 오늘의 랭킹", roomCreate: "⚔️ 친구 대결방 만들기",
+    roomInviteEnd: "⚔️ 대결방에 친구 초대하기", roomCreateEnd: "⚔️ 친구 대결방 만들기",
+    inviteMine: (pts, lasted) => `내 기록: ${pts}점 · ${lasted}\n`,
+    inviteText: (mine, url) => `⚔️ 점빵 대결방에 초대합니다!\n${mine}누가 제일 빠른지 겨뤄봐요 🎯${url ? "\n👉 " + url : ""}`,
     panelCopied: "✅ 복사됐어요! 카카오톡·문자에 붙여넣기 하세요",
     panelManual: "아래 글을 길게 눌러 전체 선택 → 복사해 주세요",
     panelInApp: "💡 앱 안에서 열린 화면이에요. 오른쪽 위 메뉴(⋮ 또는 ···)에서 '다른 브라우저로 열기'를 누르면 휴대폰 공유 창을 쓸 수 있어요.",
@@ -385,6 +477,33 @@ const I18N = {
     sharedFallback: "✅ Sharing isn't available here, so we copied it instead",
     copyFail: "Couldn't copy. Long-press the emoji above to copy",
     panelTitle: "📤 Share your result", panelCopy: "📋 Copy", panelClose: "Close",
+    rkTitle: "🏆 Today's ranking", rkNickPh: "Nickname (max 12)", rkSubmit: "Submit",
+    rkNickHint: "No sign-up, just a nickname. Next runs are submitted automatically.",
+    rkSending: "Submitting…", rkRetry: "Retry", rkViewBoard: "View leaderboard",
+    rkToday: (n, t) => `<b>#${n}</b> today <small>of ${t.toLocaleString()}</small>`,
+    rkRoom: (n, t) => `⚔️ #${n} in your room of ${t}`,
+    rkBestNote: b => `Based on your best today: ${b.toLocaleString()} pts`,
+    rkNickChange: "Change nickname", rkNickSaved: "Your new nickname shows from your next run",
+    rkSkip: "Hit at least one dot to get ranked",
+    rkErr_nickname: "Use up to 12 letters or numbers",
+    rkErr_nickname_bad: "That nickname isn't allowed",
+    rkErr_invalid: "This run couldn't be verified for the ranking",
+    rkErr_too_soon: "Please try again in a moment", rkErr_too_many: "Please try again in a moment",
+    rkErr_limit: "Daily submission limit reached",
+    rkErr_room: "Invalid room link",
+    rkErr_network: "Can't reach the ranking server",
+    shareRankToday: (n, t) => `🏆 #${n} today of ${t.toLocaleString()} players`,
+    shareRankRoom: (n, t) => `⚔️ #${n} in our room of ${t}`,
+    bpToday: "🏆 Today", bpRoom: "⚔️ Room", bpLoading: "Loading…",
+    bpEmpty: "No scores yet. Be the first!",
+    bpTodayFoot: t => `${t.toLocaleString()} players today · resets daily at midnight (KST)`,
+    bpRoomFoot: (t, c) => `Room #${c} · ${t} players`,
+    roomBanner: c => `⚔️ Room #${c}`, roomBannerSub: "Everyone who joins via this link competes here",
+    roomBoard: "Room ranking", roomInvite: "Invite", roomLeave: "Leave room",
+    rkTodayBoard: "🏆 Today's ranking", roomCreate: "⚔️ Challenge friends",
+    roomInviteEnd: "⚔️ Invite friends to this room", roomCreateEnd: "⚔️ Create a friend challenge room",
+    inviteMine: (pts, lasted) => `My score: ${pts} pts · ${lasted}\n`,
+    inviteText: (mine, url) => `⚔️ You're invited to a Rhythm Dot Tap challenge!\n${mine}Who's the fastest? 🎯${url ? "\n👉 " + url : ""}`,
     panelCopied: "✅ Copied! Paste it into any chat",
     panelManual: "Long-press the text below → Select all → Copy",
     panelInApp: "💡 You're in an in-app browser. Open the menu (⋮ or ···) and choose 'Open in browser' to use your phone's share sheet.",
@@ -684,6 +803,7 @@ function startGame() {
   $("endScreen").classList.add("hidden");
   $("thanksScreen").classList.add("hidden"); clearTimeout(thanksTimer);
   $("sharePanel").classList.add("hidden");
+  closeBoard(); clearTimeout(retryTimer);
   state = "count"; countT = 3;
   document.body.classList.add("playing");
   $("countdown").style.display = "flex";
@@ -730,6 +850,7 @@ function endGame(reason) {
     newBest: score > prevBest && score > 0, line: emojiLine(),
   };
   renderEnd();
+  rankingOnEnd();                                         // 🏆 랭킹 등록
   $("shareMsg").textContent = "";
   $("endScreen").classList.toggle("puppy-bg", reason === "clear");
   if (reason === "clear") setTimeout(showThanks, 500);      // 2분 완주 → 강아지 인사 먼저
@@ -803,7 +924,10 @@ function emojiLine() {
 }
 
 function shareUrl() {
-  return SHARE_URL || (location.protocol.startsWith("http") ? location.origin + location.pathname : "");
+  const base = SHARE_URL || (location.protocol.startsWith("http") ? location.origin + location.pathname : "");
+  if (!base || !ROOM) return base;
+  try { const u = new URL(base); u.searchParams.set("room", ROOM); return u.toString(); }   // 대결방이면 방 링크로
+  catch (e) { return base + (base.includes("?") ? "&" : "?") + "room=" + ROOM; }
 }
 
 // 공유/복사되는 글 (현재 언어로 만듦)
@@ -816,7 +940,9 @@ function buildShareText() {
   const stats = r.avgRt ? T("shareStats", fmtRt(r.avgRt), rankOf(r.avgRt), pts) : T("sharePts", pts);
   // 버틴 시간 + 도달 레벨 (완주했으면 "완주!")
   const lasted = r.reason === "clear" ? T("shareCleared", r.level) : T("shareLasted", fmtTime(r.time), r.level);
-  return [`${T("gameTitle")} ${date}`, r.line, lasted, stats, shareUrl()].filter(Boolean).join("\n");
+  const ri = r.rankInfo;   // 랭킹에 등록됐으면 순위도 함께
+  const rankLines = ri ? [T("shareRankToday", ri.rank, ri.total), ri.room_rank ? T("shareRankRoom", ri.room_rank, ri.room_total) : ""] : [];
+  return [`${T("gameTitle")} ${date}`, r.line, lasted, ...rankLines, stats, shareUrl()].filter(Boolean).join("\n");
 }
 
 // 복사: 휴대폰(특히 아이폰)에서도 되도록, 탭한 그 순간에 바로(동기식) 복사를 먼저 시도
@@ -900,8 +1026,8 @@ $("copyBtn").addEventListener("click", async () => {
 // 📤 공유하기
 //  - 휴대폰 브라우저(크롬·사파리 등): 휴대폰 공유 창 (카카오톡·문자·X 등 선택)
 //  - 공유 창이 없는 곳(카카오톡 안 브라우저, PC 일부): 공유 패널 (자동 복사 + X·LINE 버튼)
-$("shareBtn").addEventListener("click", () => {
-  const text = buildShareText();
+$("shareBtn").addEventListener("click", () => shareOut(buildShareText()));
+function shareOut(text) {
   const data = { text };
   const canNative = !!navigator.share && !IN_APP && (!navigator.canShare || navigator.canShare(data));
   if (!canNative) { openSharePanel(text, true); return; }
@@ -910,6 +1036,249 @@ $("shareBtn").addEventListener("click", () => {
     if (err && err.name === "AbortError") return;   // 사용자가 공유 창을 닫음
     openSharePanel(text, false);                    // 실패 → 패널에서 버튼을 한 번 더 누르면 복사
   });
+}
+
+/* ===================== 랭킹: 오늘의 랭킹 + 단톡방 대결방 ===================== */
+const RANKING_ON = !!(SUPABASE_URL && SUPABASE_KEY);
+const NICK_KEY = "dotRhythm.nickname", CLIENT_KEY = "dotRhythm.clientId";
+const NICK_RE = /^[0-9A-Za-z가-힣ㄱ-ㅎㅏ-ㅣ _.\-]{1,12}$/;
+function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+function esc(x) { return String(x).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+function newUuid() {
+  if (window.crypto && crypto.randomUUID) { try { return crypto.randomUUID(); } catch (e) {} }
+  const b = crypto.getRandomValues(new Uint8Array(16));
+  b[6] = (b[6] & 15) | 64; b[8] = (b[8] & 63) | 128;
+  const h = [...b].map(x => x.toString(16).padStart(2, "0")).join("");
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+}
+// 브라우저마다 무작위 ID 하나 (가입 없이 같은 사람인지 구분용)
+const CLIENT_ID = (() => {
+  let id = lsGet(CLIENT_KEY);
+  if (!id || !/^[0-9a-f-]{36}$/i.test(id)) { id = newUuid(); lsSet(CLIENT_KEY, id); }
+  return id;
+})();
+let nickname = lsGet(NICK_KEY) || "";
+// 주소에 ?room=abc123 이 있으면 대결방
+let ROOM = (() => {
+  const r = (new URLSearchParams(location.search).get("room") || "").toLowerCase();
+  return /^[a-z0-9]{6}$/.test(r) ? r : "";
+})();
+let rankState = { status: "idle" };      // idle | skip | need_nick | edit | sending | done | error
+let retryTimer = 0;
+const cleanNick = x => (x || "").replace(/\s+/g, " ").trim();
+
+async function rpc(fn, args) {
+  const ctrl = new AbortController();
+  const to = setTimeout(() => ctrl.abort(), 8000);
+  try {
+    const res = await fetch(SUPABASE_URL.replace(/\/+$/, "") + "/rest/v1/rpc/" + fn, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", apikey: SUPABASE_KEY },
+      body: JSON.stringify(args), signal: ctrl.signal,
+    });
+    if (!res.ok) throw new Error("http_" + res.status);
+    return await res.json();
+  } finally { clearTimeout(to); }
+}
+
+// 게임이 끝나면: 닉네임이 있으면 자동 등록, 없으면 입력칸 표시
+function rankingOnEnd() {
+  if (!RANKING_ON) return;
+  clearTimeout(retryTimer);
+  if (!lastResult.hits) rankState = { status: "skip" };
+  else if (!nickname) rankState = { status: "need_nick" };
+  else { submitScore(); return; }
+  renderRankBox();
+}
+
+async function submitScore(isRetry) {
+  const r = lastResult;
+  if (!RANKING_ON || !r || !r.hits) return;
+  rankState = { status: "sending" }; renderRankBox();
+  let res;
+  try {
+    res = await rpc("dr_submit_score", {
+      p_client_id: CLIENT_ID, p_nickname: nickname, p_room: ROOM || null,
+      p_score: r.score, p_avg_rt: r.avgRt, p_level: r.level,
+      p_lasted: Math.floor(r.time * 10) / 10, p_cleared: r.reason === "clear",
+      p_hits: r.hits, p_golds: r.specials, p_blues: r.blues || 0, p_perfects: r.perfects,
+    });
+  } catch (e) { res = { ok: false, error: "network" }; }
+  if (r !== lastResult) return;                       // 그새 새 게임이 시작됨
+  if (res && res.ok) {
+    r.rankInfo = res; r.rankRoom = ROOM;
+    rankState = { status: "done" };
+  } else {
+    const code = (res && res.error) || "network";
+    if (code === "too_soon" && !isRetry) {            // 너무 빨리 다시 보냈으면 잠깐 뒤 자동 재시도
+      retryTimer = setTimeout(() => { if (r === lastResult) submitScore(true); }, 3500);
+      return;
+    }
+    rankState = { status: (code === "nickname" || code === "nickname_bad") ? "need_nick" : "error", code };
+  }
+  renderRankBox();
+}
+
+function nickFormHtml(errCode) {
+  return (errCode ? `<p class="rk-err">${esc(T("rkErr_" + errCode) || T("rkErr_network"))}</p>` : "") +
+    `<form class="rk-form" id="nickForm" autocomplete="off">
+       <input id="nickInput" maxlength="12" placeholder="${esc(T("rkNickPh"))}" value="${esc(nickname)}" enterkeyhint="done">
+       <button class="btn sm" type="submit">${esc(T("rkSubmit"))}</button>
+     </form><p class="rk-hint">${esc(T("rkNickHint"))}</p>`;
+}
+
+function renderRankBox() {
+  const box = $("rankBox");
+  if (!RANKING_ON || !lastResult) { box.hidden = true; box.innerHTML = ""; return; }
+  box.hidden = false;
+  const st = rankState, r = lastResult;
+  let html = `<h3>${esc(T("rkTitle"))}</h3>`;
+  if (st.status === "skip") html += `<p class="rk-sub">${esc(T("rkSkip"))}</p>`;
+  else if (st.status === "need_nick" || st.status === "edit") html += nickFormHtml(st.code);
+  else if (st.status === "sending") html += `<p class="rk-sub">${esc(T("rkSending"))}</p>`;
+  else if (st.status === "error") {
+    html += `<p class="rk-err">${esc(T("rkErr_" + st.code) || T("rkErr_network"))}</p>`;
+    if (st.code === "network" || st.code === "too_soon" || st.code === "too_many")
+      html += `<div class="rk-actions"><button class="btn sm ghost" data-act="retry">${esc(T("rkRetry"))}</button></div>`;
+  } else if (st.status === "done" && r.rankInfo) {
+    const i = r.rankInfo;
+    html += `<div class="rk-main">${T("rkToday", i.rank, i.total)}</div>`;
+    if (i.room_rank) html += `<div class="rk-room">${esc(T("rkRoom", i.room_rank, i.room_total))}</div>`;
+    if (!i.is_best) html += `<p class="rk-sub">${esc(T("rkBestNote", i.best))}</p>`;
+    if (st.saved) html += `<p class="rk-sub">${esc(T("rkNickSaved"))}</p>`;
+    html += `<div class="rk-actions"><button class="btn sm" data-act="board">${esc(T("rkViewBoard"))}</button>
+             <button class="linkbtn" data-act="editnick">${esc(nickname)} · ${esc(T("rkNickChange"))}</button></div>`;
+  }
+  box.innerHTML = html;
+  const inp = $("nickInput");
+  if (inp && st.status !== "edit" && !nickname && window.matchMedia("(pointer:fine)").matches) inp.focus();
+}
+
+// 닉네임 입력
+document.addEventListener("submit", e => {
+  if (e.target.id !== "nickForm") return;
+  e.preventDefault();
+  const v = cleanNick($("nickInput").value);
+  if (!NICK_RE.test(v)) { rankState = { status: rankState.status === "edit" ? "edit" : "need_nick", code: "nickname" }; renderRankBox(); return; }
+  const wasEdit = rankState.status === "edit";
+  nickname = v; lsSet(NICK_KEY, v);
+  $("nickInput").blur();
+  if (wasEdit && lastResult && lastResult.rankInfo) { rankState = { status: "done", saved: true }; renderRankBox(); }
+  else submitScore();
+});
+
+/* ----- 순위표 패널 ----- */
+let boardTab = "today", boardReq = 0;
+function openBoard(tab) {
+  if (!RANKING_ON) return;
+  boardTab = (tab === "room" && ROOM) ? "room" : "today";
+  $("boardPanel").classList.remove("hidden");
+  loadBoard();
+}
+function closeBoard() { $("boardPanel").classList.add("hidden"); }
+function renderBoardTabs() {
+  $("bpTabs").innerHTML = `<button data-tab="today" class="${boardTab === "today" ? "on" : ""}">${esc(T("bpToday"))}</button>` +
+    (ROOM ? `<button data-tab="room" class="${boardTab === "room" ? "on" : ""}">${esc(T("bpRoom"))}</button>` : "");
+}
+async function loadBoard() {
+  renderBoardTabs();
+  $("bpBody").innerHTML = `<div class="bp-msg">${esc(T("bpLoading"))}</div>`;
+  $("bpFoot").textContent = "";
+  const my = ++boardReq, tab = boardTab;
+  let res;
+  try { res = await rpc("dr_get_board", { p_room: tab === "room" ? ROOM : null, p_client_id: CLIENT_ID, p_limit: 50 }); }
+  catch (e) { res = { ok: false, error: "network" }; }
+  if (my !== boardReq) return;
+  if (!res || !res.ok) { $("bpBody").innerHTML = `<div class="bp-msg">${esc(T("rkErr_" + ((res && res.error) || "network")) || T("rkErr_network"))}</div>`; return; }
+  boardData = { tab, res };
+  renderBoardBody();
+}
+let boardData = null;
+function renderBoardBody() {
+  if (!boardData) return;
+  const { tab, res } = boardData;
+  const medal = n => n === 1 ? "🥇" : n === 2 ? "🥈" : n === 3 ? "🥉" : n;
+  const row = x => `<li class="${x.me ? "me" : ""}"><span class="n">${medal(x.rank)}</span>
+      <span class="who"><span>${esc(x.nickname)}</span><small>⚡${Number(x.avg_rt).toFixed(2)} · LV${x.level}${x.cleared ? " 🏁" : ""}</small></span>
+      <b>${Number(x.score).toLocaleString()}</b></li>`;
+  const top = res.top || [];
+  let html = top.length ? "<ol>" + top.map(row).join("") : `<div class="bp-msg">${esc(T("bpEmpty"))}</div>`;
+  if (top.length) {
+    if (res.me && !top.some(x => x.me)) html += `<li class="gap">⋮</li>` + row(res.me);
+    html += "</ol>";
+  }
+  $("bpBody").innerHTML = html;
+  $("bpFoot").textContent = tab === "room" ? T("bpRoomFoot", res.total, ROOM) : T("bpTodayFoot", res.total);
+  const me = $("bpBody").querySelector("li.me");
+  if (me) me.scrollIntoView({ block: "nearest" });
+}
+$("bpTabs").addEventListener("click", e => { const b = e.target.closest("button[data-tab]"); if (b) { boardTab = b.dataset.tab; loadBoard(); } });
+$("bpClose").addEventListener("click", closeBoard);
+$("boardPanel").addEventListener("click", e => { if (e.target.id === "boardPanel") closeBoard(); });
+
+/* ----- 대결방 ----- */
+function newRoomCode() {
+  const a = "abcdefghijkmnpqrstuvwxyz23456789";     // 헷갈리는 글자(l, o, 0, 1) 제외
+  return [...crypto.getRandomValues(new Uint8Array(6))].map(x => a[x % a.length]).join("");
+}
+function setRoom(code) {
+  ROOM = code;
+  try {
+    const u = new URL(location.href);
+    if (code) u.searchParams.set("room", code); else u.searchParams.delete("room");
+    history.replaceState(null, "", u.toString());
+  } catch (e) {}
+  renderRoomUI();
+}
+function inviteText() {
+  const r = lastResult;
+  let mine = "";
+  if (r && r.hits) {
+    const lasted = r.reason === "clear" ? T("shareCleared", r.level) : T("shareLasted", fmtTime(r.time), r.level);
+    mine = T("inviteMine", r.score.toLocaleString(), lasted);
+  }
+  return T("inviteText", mine, shareUrl());
+}
+// 대결방 만들고 바로 초대 (공유 창은 탭한 순간 열어야 해서 먼저 호출)
+function createRoomAndInvite() {
+  setRoom(newRoomCode());
+  shareOut(inviteText());
+  const r = lastResult;
+  if (r && r.rankInfo) {               // 방금 등록한 기록을 새 방에도 올림
+    rpc("dr_copy_to_room", { p_client_id: CLIENT_ID, p_room: ROOM }).then(res => {
+      if (res && res.ok && r === lastResult) { r.rankInfo.room_rank = res.room_rank; r.rankInfo.room_total = res.room_total; renderRankBox(); }
+    }).catch(() => {});
+  }
+}
+function leaveRoom() { setRoom(""); }
+
+function renderRoomUI() {
+  const sr = $("startRank"), ra = $("roomArea");
+  if (!RANKING_ON) { sr.hidden = true; ra.hidden = true; return; }
+  sr.hidden = false;
+  sr.innerHTML = (ROOM ? `<div class="room-banner"><b>${esc(T("roomBanner", ROOM))}</b><p>${esc(T("roomBannerSub"))}</p>
+        <div class="rk-actions"><button class="btn sm" data-act="board-room">${esc(T("roomBoard"))}</button>
+        <button class="btn sm ghost" data-act="invite">${esc(T("roomInvite"))}</button>
+        <button class="linkbtn" data-act="leave">${esc(T("roomLeave"))}</button></div></div>` : "") +
+    `<div class="rk-actions"><button class="btn sm ghost" data-act="board">${esc(T("rkTodayBoard"))}</button>` +
+    (ROOM ? "" : `<button class="btn sm ghost" data-act="mkroom">${esc(T("roomCreate"))}</button>`) + `</div>`;
+  ra.hidden = false;
+  ra.innerHTML = `<button class="btn ghost" data-act="${ROOM ? "invite" : "mkroom"}">${esc(T(ROOM ? "roomInviteEnd" : "roomCreateEnd"))}</button>`;
+}
+
+// 랭킹 관련 버튼들 (한 곳에서 처리)
+document.addEventListener("click", e => {
+  const b = e.target.closest("[data-act]");
+  if (!b) return;
+  const act = b.dataset.act;
+  if (act === "board") openBoard("today");
+  else if (act === "board-room") openBoard("room");
+  else if (act === "mkroom") createRoomAndInvite();
+  else if (act === "invite") shareOut(inviteText());
+  else if (act === "leave") leaveRoom();
+  else if (act === "retry") submitScore();
+  else if (act === "editnick") { rankState = { status: "edit" }; renderRankBox(); const i = $("nickInput"); if (i) { i.focus(); i.select(); } }
 });
 
 /* ===================== 언어 적용 ===================== */
@@ -924,6 +1293,7 @@ function applyLang() {
   renderEnd();
   $("shareMsg").textContent = "";
   showNowPlaying();
+  renderRankBox(); renderRoomUI(); renderBoardTabs(); renderBoardBody();
 }
 document.querySelectorAll("#langSwitch button").forEach(b => b.addEventListener("click", () => {
   lang = b.dataset.lang;
