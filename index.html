@@ -29,6 +29,7 @@
   #lives{text-align:center;margin-top:6px;font-size:18px;letter-spacing:4px}
   #lives .on{color:var(--red)} #lives .off{color:#d5d9e8}
   #lives.warn{animation:warn .5s ease-in-out 3}
+  #nowPlaying{text-align:center;margin-top:2px;font-size:12px;color:var(--muted);min-height:16px}
   @keyframes warn{50%{transform:scale(1.25)}}
   .red{color:var(--red)}
   .reason{font-size:14px;margin:8px 0 2px;color:var(--muted)}
@@ -105,6 +106,27 @@
     padding:5px 10px;border-radius:999px;cursor:pointer;font-family:inherit}
   #langSwitch button.on{background:var(--mint);color:#0b1a14}
   body.playing #langSwitch{display:none}
+
+  /* 공유 창을 못 여는 환경(카카오톡 안 브라우저 등)에서 뜨는 공유 패널 */
+  #sharePanel{position:fixed;inset:0;z-index:8;display:flex;align-items:flex-end;justify-content:center;
+    background:rgba(27,31,59,.35);padding:12px}
+  #sharePanel.hidden{display:none}
+  #sharePanel .sheet{width:100%;max-width:420px;background:#fff;border-radius:20px;padding:18px 16px 14px;
+    box-shadow:0 -8px 40px rgba(30,40,90,.2);animation:sheetUp .25s ease-out}
+  @keyframes sheetUp{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}}
+  #sharePanel h3{font-size:16px;margin-bottom:4px}
+  #sharePanel .status{font-size:13px;color:var(--mint-ink);min-height:18px;margin-bottom:8px}
+  #sharePanel .status.fail{color:var(--red)}
+  #sharePanel textarea{width:100%;height:120px;resize:none;border:1px solid var(--line);border-radius:12px;
+    padding:10px;font-size:14px;line-height:1.45;font-family:inherit;color:var(--ink);background:var(--soft);
+    user-select:text;-webkit-user-select:text}
+  #sharePanel .row{display:flex;gap:8px;margin-top:10px}
+  #sharePanel .row .btn{font-size:15px;padding:12px 6px;text-decoration:none;text-align:center}
+  #sharePanel .btn.x{background:#111;color:#fff}
+  #sharePanel .btn.line{background:#06c755;color:#fff}
+  #sharePanel .tip{font-size:12px;color:var(--muted);margin-top:10px;line-height:1.5}
+  #sharePanel .close{display:block;width:100%;margin-top:10px;border:0;background:none;color:var(--muted);
+    font-weight:600;font-size:14px;font-family:inherit;padding:8px;cursor:pointer}
   @media (max-width:520px){              /* 좁은 화면: 점수판이 소리 버튼과 겹치지 않게 */
     #hud{padding-right:54px}
     #stats{gap:6px}
@@ -154,6 +176,7 @@
   </div>
   <div id="timebar"><div id="timefill"></div></div>
   <div id="lives"></div>
+  <div id="nowPlaying"></div>
 </div>
 <div id="topRight">
   <button id="muteBtn" title="소리 켜기/끄기">🔊</button>
@@ -194,6 +217,22 @@
   <div class="thanks-text">
     <h2 data-i18n="thanksTitle">2분 완주!</h2>
     <p data-i18n="thanksHint">화면을 누르면 결과를 볼 수 있어요</p>
+  </div>
+</div>
+
+<!-- 공유 패널 (휴대폰 공유 창을 못 열 때) -->
+<div id="sharePanel" class="hidden">
+  <div class="sheet" role="dialog" aria-modal="true">
+    <h3 data-i18n="panelTitle">📤 결과 공유하기</h3>
+    <div class="status" id="panelStatus"></div>
+    <textarea id="panelText" readonly></textarea>
+    <div class="row">
+      <button class="btn" id="panelCopy" data-i18n="panelCopy">📋 복사하기</button>
+      <a class="btn x" id="panelX" target="_blank" rel="noopener">𝕏</a>
+      <a class="btn line" id="panelLine" target="_blank" rel="noopener">LINE</a>
+    </div>
+    <div class="tip" id="panelTip"></div>
+    <button class="close" id="panelClose" data-i18n="panelClose">닫기</button>
   </div>
 </div>
 
@@ -283,6 +322,7 @@ const I18N = {
       <li>◆ 콤보 ${BLUE_EVERY_COMBO}회마다 <b class="blue">파란 점</b>이 나와요: <b>+${POINTS_BLUE}점</b></li>
       <li>♪ <b class="lime">박자</b>에 딱 맞춰 누르면 PERFECT <b>+5점</b></li>
       <li>⚡ 점이 나타나서 누를 때까지 <b>반응 시간</b>을 재요</li>
+      <li>🎵 점을 맞힐 때마다 <b>음악이 한 음씩</b> 연주돼요</li>
       <li>⏱ 10초마다 점이 <b>작아지고 빨라져요</b> <span style="white-space:nowrap">(총 ${LEVELS.length}단계)</span></li>
       <li>🔥 콤보 10회마다 점수 배율 ×2, ×3, ×4</li>
       <li>✕ 점을 놓치거나 빈 곳을 누르면 <b class="red">틀림</b> (콤보도 끊겨요)</li>
@@ -298,6 +338,10 @@ const I18N = {
     copied: "✅ 복사됐어요! 단톡방에 붙여넣기 하세요",
     sharedFallback: "✅ 공유 창을 열 수 없어 대신 복사했어요. 붙여넣기 하세요",
     copyFail: "복사가 안 됐어요. 위 이모지를 길게 눌러 복사하세요",
+    panelTitle: "📤 결과 공유하기", panelCopy: "📋 복사하기", panelClose: "닫기",
+    panelCopied: "✅ 복사됐어요! 카카오톡·문자에 붙여넣기 하세요",
+    panelManual: "아래 글을 길게 눌러 전체 선택 → 복사해 주세요",
+    panelInApp: "💡 앱 안에서 열린 화면이에요. 오른쪽 위 메뉴(⋮ 또는 ···)에서 '다른 브라우저로 열기'를 누르면 휴대폰 공유 창을 쓸 수 있어요.",
     recordsTitle: "🏆 내 최고 기록", recordsEmpty: "아직 기록이 없어요. 첫 기록을 세워 보세요!",
     rankNo: n => `${n}위`,
     newBest: "🎉 최고 기록 갱신!",
@@ -324,6 +368,7 @@ const I18N = {
       <li>◆ Every ${BLUE_EVERY_COMBO} combo a <b class="blue">blue dot</b> appears: <b>+${POINTS_BLUE}</b></li>
       <li>♪ Tap right on the <b class="lime">beat</b> for PERFECT <b>+5</b></li>
       <li>⚡ Your <b>reaction time</b> is measured for every dot</li>
+      <li>🎵 Every hit plays the <b>next note of the song</b></li>
       <li>⏱ Every 10s the dots get <b>smaller and faster</b> <span style="white-space:nowrap">(${LEVELS.length} levels)</span></li>
       <li>🔥 Every 10 combo: score ×2, ×3, ×4</li>
       <li>✕ Missing a dot or tapping empty space is a <b class="red">miss</b> (combo resets)</li>
@@ -339,6 +384,10 @@ const I18N = {
     copied: "✅ Copied! Paste it in your group chat",
     sharedFallback: "✅ Sharing isn't available here, so we copied it instead",
     copyFail: "Couldn't copy. Long-press the emoji above to copy",
+    panelTitle: "📤 Share your result", panelCopy: "📋 Copy", panelClose: "Close",
+    panelCopied: "✅ Copied! Paste it into any chat",
+    panelManual: "Long-press the text below → Select all → Copy",
+    panelInApp: "💡 You're in an in-app browser. Open the menu (⋮ or ···) and choose 'Open in browser' to use your phone's share sheet.",
     recordsTitle: "🏆 My best scores", recordsEmpty: "No records yet. Set your first one!",
     rankNo: n => `#${n}`,
     newBest: "🎉 New best!",
@@ -416,6 +465,65 @@ const sfx = {
   miss:    () => tone(180, 0.15, "sawtooth", 0.06, 90),
   level:   () => { [523, 659, 784].forEach((f, i) => setTimeout(() => tone(f, 0.12, "square", 0.05), i * 80)); },
 };
+/* ===================== 멜로디: 점을 맞힐 때마다 다음 음이 연주됨 ===================== */
+// 모두 저작권이 끝난(퍼블릭 도메인) 곡. 숫자 = 음 높이 (60=도, 62=레, 64=미, 65=파, 67=솔, 69=라, 71=시, 72=높은 도)
+// shift: 전체를 몇 반음 올릴지 (12 = 한 옥타브 위, 휴대폰 스피커에서 더 잘 들림)
+const SONGS = [
+  { ko: "베토벤 · 환희의 송가", en: "Beethoven · Ode to Joy", shift: 12, notes: [
+    64,64,65,67, 67,65,64,62, 60,60,62,64, 64,62,62,
+    64,64,65,67, 67,65,64,62, 60,60,62,64, 62,60,60,
+    62,62,64,60, 62,64,65,64,60, 62,64,65,64,62, 60,62,55,
+    64,64,65,67, 67,65,64,62, 60,60,62,64, 62,60,60 ] },
+  { ko: "반짝반짝 작은 별", en: "Twinkle Twinkle Little Star", shift: 12, notes: [
+    60,60,67,67,69,69,67, 65,65,64,64,62,62,60,
+    67,67,65,65,64,64,62, 67,67,65,65,64,64,62,
+    60,60,67,67,69,69,67, 65,65,64,64,62,62,60 ] },
+  { ko: "베토벤 · 엘리제를 위하여", en: "Beethoven · Für Elise", shift: 0, notes: [
+    76,75,76,75,76,71,74,72,69, 60,64,69,71, 64,68,71,72,
+    64,76,75,76,75,76,71,74,72,69, 60,64,69,71, 64,72,71,69 ] },
+  { ko: "파헬벨 · 캐논", en: "Pachelbel · Canon in D", shift: 0, notes: [
+    78,76,74,73,71,69,71,73, 74,73,71,69,67,66,67,64 ] },
+];
+let songIdx = 0, noteIdx = 0;
+function resetMelody() { songIdx = 0; noteIdx = 0; showNowPlaying(); }
+function showNowPlaying() { $("nowPlaying").textContent = "🎵 " + SONGS[songIdx][lang]; }
+function nextNote() {
+  const song = SONGS[songIdx];
+  const midi = song.notes[noteIdx] + song.shift;
+  noteIdx++;
+  if (noteIdx >= song.notes.length) {           // 곡이 끝나면 다음 곡으로 (마지막 곡 다음엔 처음으로)
+    noteIdx = 0; songIdx = (songIdx + 1) % SONGS.length;
+    showNowPlaying();
+  }
+  return midi;
+}
+// 피아노·실로폰 비슷한 소리 (톡 치고 은은하게 사라짐)
+function pluck(midi, vol = 0.2, dur = 0.8, delay = 0) {
+  if (!actx || muted) return;
+  const f = 440 * Math.pow(2, (midi - 69) / 12);
+  const t0 = actx.currentTime + delay;
+  const g = actx.createGain();
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(vol, t0 + 0.006);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  g.connect(actx.destination);
+  [[f, "triangle", 1], [f * 2, "sine", 0.3], [f * 3, "sine", 0.08]].forEach(([fr, type, amp]) => {
+    const o = actx.createOscillator(), og = actx.createGain();
+    o.type = type; o.frequency.setValueAtTime(fr, t0);
+    og.gain.value = amp;
+    o.connect(og).connect(g);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+  });
+}
+// 점 종류에 따라 화음을 더함
+function playMelody(kind, perfect) {
+  const m = nextNote();
+  pluck(m);
+  if (kind === "blue")      { pluck(m + 7, 0.12, 0.9, 0.05); pluck(m + 12, 0.12, 1.0, 0.10); pluck(m - 12, 0.10, 1.0); }
+  else if (kind === "gold") { pluck(m + 7, 0.11, 0.8, 0.03); pluck(m - 12, 0.08, 0.9); }
+  if (perfect) pluck(m + 12, 0.06, 0.5, 0.02);   // PERFECT: 반짝이는 높은 음
+}
+
 $("muteBtn").addEventListener("click", () => {
   muted = !muted; $("muteBtn").textContent = muted ? "🔇" : "🔊";
 });
@@ -465,6 +573,7 @@ function fmtRt(sec) { return T("sec", sec.toFixed(2)); }
 function round2(sec) { return Math.round(sec * 100) / 100; }
 
 function resetGame() {
+  resetMelody();
   reactions = []; missTimes = [];
   t = 0; score = 0; combo = 0; maxCombo = 0; hits = 0; misses = 0; specials = 0; perfects = 0;
   blues = 0; blueNext = false;
@@ -547,7 +656,7 @@ function hitDot(x, y, clickAt) {
   if (perfect) addPopup(d.x, d.y + d.r + 18, "PERFECT!", "#5a8a00", 15);
   addPopup(d.x, d.y + d.r + (perfect ? 38 : 18), `⚡ ${fmtRt(rt)}`, "#1b1f3b", 14);
   burst(d.x, d.y, color, d.blue ? 40 : d.special ? 28 : 14);
-  if (d.blue) sfx.blue(); else if (d.special) sfx.special(); else if (perfect) sfx.perfect(); else sfx.hit();
+  playMelody(d.blue ? "blue" : d.special ? "gold" : "normal", perfect);   // 🎵 다음 음 연주
 
   // 콤보 30, 60, 90...에 도달하면 다음 점은 파란 점
   if (combo % BLUE_EVERY_COMBO === 0) { blueNext = true; showToast(T("blueIncoming", combo), "#1f6fe0"); }
@@ -574,6 +683,7 @@ function startGame() {
   $("startScreen").classList.add("hidden");
   $("endScreen").classList.add("hidden");
   $("thanksScreen").classList.add("hidden"); clearTimeout(thanksTimer);
+  $("sharePanel").classList.add("hidden");
   state = "count"; countT = 3;
   document.body.classList.add("playing");
   $("countdown").style.display = "flex";
@@ -709,26 +819,64 @@ function buildShareText() {
   return [`${T("gameTitle")} ${date}`, r.line, lasted, stats, shareUrl()].filter(Boolean).join("\n");
 }
 
-async function copyText(text) {
+// 복사: 휴대폰(특히 아이폰)에서도 되도록, 탭한 그 순간에 바로(동기식) 복사를 먼저 시도
+function copyTextSync(text) {
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.setAttribute("aria-hidden", "true");
+  ta.contentEditable = "true";                 // 아이폰은 읽기 전용 칸에서 복사가 안 됨
+  ta.style.cssText = "position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;font-size:16px;" +
+                     "user-select:text;-webkit-user-select:text;";   // 16px: 아이폰 자동 확대 방지
+  document.body.appendChild(ta);
+  let ok = false;
   try {
-    if (navigator.clipboard && window.isSecureContext) {
-      await navigator.clipboard.writeText(text);
-      return true;
-    }
-  } catch (e) {}
-  // 예전 브라우저나 파일로 직접 연 경우를 위한 대체 방법
-  try {
-    const ta = document.createElement("textarea");
-    ta.value = text;
-    ta.setAttribute("readonly", "");
-    ta.style.cssText = "position:fixed;top:0;left:0;opacity:0;user-select:text;-webkit-user-select:text";
-    document.body.appendChild(ta);
-    ta.select(); ta.setSelectionRange(0, text.length);
-    const ok = document.execCommand("copy");
-    document.body.removeChild(ta);
-    return ok;
-  } catch (e) { return false; }
+    const range = document.createRange();
+    range.selectNodeContents(ta);
+    const sel = window.getSelection();
+    sel.removeAllRanges(); sel.addRange(range);
+    ta.select();
+    ta.setSelectionRange(0, text.length);
+    ok = document.execCommand("copy");
+  } catch (e) { ok = false; }
+  document.body.removeChild(ta);
+  try { window.getSelection().removeAllRanges(); } catch (e) {}
+  return ok;
 }
+async function copyText(text) {
+  if (copyTextSync(text)) return true;
+  try {
+    if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(text); return true; }
+  } catch (e) {}
+  return false;
+}
+
+// 카카오톡·인스타그램·페이스북·라인·네이버 앱 안의 브라우저인지
+const IN_APP = /KAKAOTALK|Instagram|FBAN|FBAV|FB_IAB|Line\/|NAVER\(inapp|DaumApps|everytimeApp|; wv\)/i.test(navigator.userAgent);
+
+// 공유 패널 열기: 자동 복사 시도 + X/LINE 버튼 + 직접 복사할 수 있는 글 상자
+function openSharePanel(text, autoCopy) {
+  $("panelText").value = text;
+  $("panelX").href = "https://twitter.com/intent/tweet?text=" + encodeURIComponent(text);
+  $("panelLine").href = "https://social-plugins.line.me/lineit/share?text=" + encodeURIComponent(text) +
+                        (shareUrl() ? "&url=" + encodeURIComponent(shareUrl()) : "");
+  const ok = autoCopy ? copyTextSync(text) : false;
+  setPanelStatus(ok ? "panelCopied" : "panelManual", !ok);
+  $("panelTip").textContent = IN_APP ? T("panelInApp") : "";
+  $("sharePanel").classList.remove("hidden");
+}
+function setPanelStatus(key, fail) {
+  const st = $("panelStatus");
+  st.textContent = T(key);
+  st.classList.toggle("fail", !!fail);
+}
+$("panelCopy").addEventListener("click", async () => {
+  const ok = await copyText($("panelText").value);
+  if (!ok) { $("panelText").focus(); $("panelText").select(); }
+  setPanelStatus(ok ? "panelCopied" : "panelManual", !ok);
+});
+$("panelClose").addEventListener("click", () => $("sharePanel").classList.add("hidden"));
+$("sharePanel").addEventListener("click", e => { if (e.target.id === "sharePanel") $("sharePanel").classList.add("hidden"); });
+$("panelText").addEventListener("focus", e => e.target.select());
 
 let msgTimer = 0;
 function shareMessage(key, btn) {
@@ -741,25 +889,27 @@ function shareMessage(key, btn) {
   }, 3000);
 }
 
-// 📋 복사하기
+// 📋 복사하기 (안 되면 공유 패널을 열어 직접 복사할 수 있게)
 $("copyBtn").addEventListener("click", async () => {
-  const ok = await copyText(buildShareText());
-  shareMessage(ok ? "copied" : "copyFail", ok ? $("copyBtn") : null);
+  const text = buildShareText();
+  const ok = await copyText(text);
+  if (ok) shareMessage("copied", $("copyBtn"));
+  else openSharePanel(text, false);
 });
 
-// 📤 공유하기: 휴대폰이면 카카오톡·문자·X 등 공유 창이 열리고, 안 되는 곳에서는 자동으로 복사
-$("shareBtn").addEventListener("click", async () => {
+// 📤 공유하기
+//  - 휴대폰 브라우저(크롬·사파리 등): 휴대폰 공유 창 (카카오톡·문자·X 등 선택)
+//  - 공유 창이 없는 곳(카카오톡 안 브라우저, PC 일부): 공유 패널 (자동 복사 + X·LINE 버튼)
+$("shareBtn").addEventListener("click", () => {
   const text = buildShareText();
-  if (navigator.share) {
-    try {
-      await navigator.share({ title: T("pageTitle"), text });
-      return;
-    } catch (e) {
-      if (e && e.name === "AbortError") return;   // 사용자가 공유 창을 닫음
-    }
-  }
-  const ok = await copyText(text);
-  shareMessage(ok ? "sharedFallback" : "copyFail", ok ? $("copyBtn") : null);
+  const data = { text };
+  const canNative = !!navigator.share && !IN_APP && (!navigator.canShare || navigator.canShare(data));
+  if (!canNative) { openSharePanel(text, true); return; }
+  // 탭한 순간 바로 호출해야 함 (중간에 await가 있으면 휴대폰이 막음)
+  navigator.share(data).catch(err => {
+    if (err && err.name === "AbortError") return;   // 사용자가 공유 창을 닫음
+    openSharePanel(text, false);                    // 실패 → 패널에서 버튼을 한 번 더 누르면 복사
+  });
 });
 
 /* ===================== 언어 적용 ===================== */
@@ -773,6 +923,7 @@ function applyLang() {
   renderRecords($("startRecords"), loadRecords());
   renderEnd();
   $("shareMsg").textContent = "";
+  showNowPlaying();
 }
 document.querySelectorAll("#langSwitch button").forEach(b => b.addEventListener("click", () => {
   lang = b.dataset.lang;
