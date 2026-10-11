@@ -20,7 +20,7 @@ No sign-up, no install. Open the link and play.
 - **Emoji score card:** your run becomes a single line of emoji (1 square = 15 seconds), ready to paste into a group chat or onto X.
 - **One-tap sharing:** opens the native share sheet on mobile (KakaoTalk, Messages, X…). Where sharing isn't supported, the result is copied to the clipboard instead.
 - **English / Korean:** switch with the EN | KR toggle. The game follows the browser language by default and remembers your choice. Add `?lang=en` or `?lang=ko` to the URL to force a language.
-- **Music as you play:** every hit plays the next note of a public-domain medley (Ode to Joy → Twinkle Twinkle → Für Elise → Canon in D).
+- **Music as you play:** every hit plays the next note of a song. Each game picks **4 random songs out of 100** public-domain melodies (Beethoven, Mozart, Bach, Chopin, Tchaikovsky, Grieg, carols, folk songs…).
 - **🏆 Today's ranking:** a daily leaderboard that resets at midnight (KST). Just pick a nickname, no account needed. After that, runs are submitted automatically.
 - **⚔️ Friend challenge rooms:** create a room and share its link (`?room=abc123`) in a group chat. Everyone who joins through the link gets their own room leaderboard.
 - **Local best scores:** your top 10 runs are saved in your own browser (localStorage).
@@ -94,7 +94,7 @@ All settings are at the top of the `<script>` in `index.html`. On-screen text up
 | `RT_FAST` / `RT_OK` | `0.50` / `0.70` | Reaction-time thresholds for 🟩 / 🟨 / 🟧 |
 | `SHARE_URL` | `""` | Game URL included in shared results |
 | `SUPABASE_URL` / `SUPABASE_KEY` | `""` | Turn on the online ranking (see above) |
-| `SONGS` | 4 songs | Melody played note-by-note on each hit |
+| `SONGS` / `PLAYLIST_SIZE` | 100 songs / `4` | Song library, and how many random songs each game plays |
 | `I18N` | `ko`, `en` | All on-screen text, per language |
 
 ## 🛠️ Built With
