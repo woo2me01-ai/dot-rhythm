@@ -50,6 +50,10 @@
 
   #countdown{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:3;
     font-size:96px;font-weight:900;color:var(--mint-ink);pointer-events:none}
+  /* 창이 너무 작을 때 덮는 안내 (게임 시작·진행을 막아요) */
+  #sizeGuard{position:fixed;inset:0;z-index:30;display:flex;align-items:center;justify-content:center;padding:16px;
+    background:rgba(246,247,251,.97);color:var(--ink);font-size:14px;font-weight:700;line-height:1.5;text-align:center}
+  #sizeGuard.hidden{display:none}
 
   /* 시작/결과 화면 */
   .overlay{position:fixed;inset:0;z-index:5;display:flex;align-items:center;justify-content:center;
@@ -107,26 +111,7 @@
   #langSwitch button.on{background:var(--mint);color:#0b1a14}
   body.playing #langSwitch{display:none}
 
-  /* 공유 창을 못 여는 환경(카카오톡 안 브라우저 등)에서 뜨는 공유 패널 */
-  #sharePanel{position:fixed;inset:0;z-index:8;display:flex;align-items:flex-end;justify-content:center;
-    background:rgba(27,31,59,.35);padding:12px}
-  #sharePanel.hidden{display:none}
-  #sharePanel .sheet{width:100%;max-width:420px;background:#fff;border-radius:20px;padding:18px 16px 14px;
-    box-shadow:0 -8px 40px rgba(30,40,90,.2);animation:sheetUp .25s ease-out}
   @keyframes sheetUp{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}}
-  #sharePanel h3{font-size:16px;margin-bottom:4px}
-  #sharePanel .status{font-size:13px;color:var(--mint-ink);min-height:18px;margin-bottom:8px}
-  #sharePanel .status.fail{color:var(--red)}
-  #sharePanel textarea{width:100%;height:120px;resize:none;border:1px solid var(--line);border-radius:12px;
-    padding:10px;font-size:14px;line-height:1.45;font-family:inherit;color:var(--ink);background:var(--soft);
-    user-select:text;-webkit-user-select:text}
-  #sharePanel .row{display:flex;gap:8px;margin-top:10px}
-  #sharePanel .row .btn{font-size:15px;padding:12px 6px;text-decoration:none;text-align:center}
-  #sharePanel .btn.x{background:#111;color:#fff}
-  #sharePanel .btn.line{background:#06c755;color:#fff}
-  #sharePanel .tip{font-size:12px;color:var(--muted);margin-top:10px;line-height:1.5}
-  #sharePanel .close{display:block;width:100%;margin-top:10px;border:0;background:none;color:var(--muted);
-    font-weight:600;font-size:14px;font-family:inherit;padding:8px;cursor:pointer}
   /* ---------- 랭킹 ---------- */
   .card,.sheet{touch-action:pan-y}
   #rankBox{background:linear-gradient(180deg,#fff8e1,#fff);border:1px solid #f1dfa0;border-radius:14px;
@@ -235,6 +220,7 @@
 </div>
 <div id="toast"></div>
 <div id="countdown"></div>
+<div id="sizeGuard" class="hidden" role="alert"></div>
 
 <!-- 시작 화면 -->
 <div class="overlay" id="startScreen">
@@ -270,21 +256,168 @@
   </div>
 </div>
 
-<!-- 공유 패널 (휴대폰 공유 창을 못 열 때) -->
-<div id="sharePanel" class="hidden">
-  <div class="sheet" role="dialog" aria-modal="true">
-    <h3 data-i18n="panelTitle">📤 결과 공유하기</h3>
-    <div class="status" id="panelStatus"></div>
-    <textarea id="panelText" readonly></textarea>
-    <div class="row">
-      <button class="btn" id="panelCopy" data-i18n="panelCopy">📋 복사하기</button>
-      <a class="btn x" id="panelX" target="_blank" rel="noopener">𝕏</a>
-      <a class="btn line" id="panelLine" target="_blank" rel="noopener">LINE</a>
-    </div>
-    <div class="tip" id="panelTip"></div>
-    <button class="close" id="panelClose" data-i18n="panelClose">닫기</button>
-  </div>
-</div>
+<!-- 공유 창 (운세 페이지와 같은 아이콘 공유 창) — 한 파일로 돌아가도록 여기에 넣어 둠 -->
+<script>
+/* 게임 공용 공유 창 — 운세 페이지와 같은 아이콘 공유 창
+   사용법:
+     ShareSheet.share({ text, url })   // 휴대폰 공유 창이 되면 그걸 열고, 안 되면 아이콘 공유 창을 열어요
+     ShareSheet.open({ text, url })    // 아이콘 공유 창을 바로 열어요
+   - text: 공유할 글 (주소는 빼고), url: 받은 사람이 눌러서 들어올 게임 주소 (없으면 빈 값)
+   - 언어는 페이지의 <html lang>을 따라가요 (ko / en)
+   - 카카오 개발자 JavaScript 키를 ShareSheet.KAKAO_JS_KEY 에 넣으면 카카오톡으로 바로 보내져요.
+     비워 두면 카카오톡 버튼은 글을 복사해 두고 대화방에 붙여 넣도록 안내해요. */
+(function () {
+  const TXT = {
+    ko: { title: "공유하기", close: "닫기", native: "기기 공유", kakao: "카카오톡", x: "X (트위터)", facebook: "페이스북", line: "라인",
+          telegram: "텔레그램", whatsapp: "왓츠앱", sms: "문자", instagram: "인스타그램", threads: "스레드",
+          linked: "받은 사람이 링크를 눌러 바로 게임을 해 볼 수 있어요.",
+          noLink: "⚠ 이 페이지가 아직 인터넷에 올라가 있지 않아서 링크 없이 결과만 공유돼요.",
+          copied: "복사했어요! 친구에게 붙여 넣어 보세요.", kakaoPaste: "복사했어요! 카카오톡 대화방에 붙여 넣어 보내 주세요.", igPaste: "복사했어요! 인스타그램 DM이나 스토리에 붙여 넣어 주세요.",
+          manual: "아래 글을 길게 눌러 복사해 주세요.", seeToo: "👉 나도 해 보기: ", kakaoBtn: "나도 해 보기", mailSubject: "우주점빵 게임 결과" },
+    en: { title: "Share", close: "Close", native: "Device share", kakao: "KakaoTalk", x: "X (Twitter)", facebook: "Facebook", line: "LINE",
+          telegram: "Telegram", whatsapp: "WhatsApp", sms: "SMS", instagram: "Instagram", threads: "Threads",
+          linked: "Your friend can tap the link and play right away.",
+          noLink: "⚠ This page isn’t online yet, so only the result is shared — without a link.",
+          copied: "Copied! Paste it to a friend.", kakaoPaste: "Copied! Paste it into a KakaoTalk chat.", igPaste: "Copied! Paste it into an Instagram DM or story.",
+          manual: "Press and hold the text below to copy it.", seeToo: "👉 Try it yourself: ", kakaoBtn: "Play now", mailSubject: "My game result" },
+  };
+  const lang = () => (document.documentElement.lang || "").startsWith("en") ? "en" : "ko";
+  const t = k => TXT[lang()][k];
+  const enc = encodeURIComponent;
+  const IN_APP = /KAKAOTALK|Instagram|FBAN|FBAV|FB_IAB|Line\/|NAVER\(inapp|DaumApps|everytimeApp|; wv\)/i.test(navigator.userAgent);
+  const IS_TOUCH = window.matchMedia && matchMedia("(pointer: coarse)").matches;
+
+  const CSS = `
+  .ss-wrap{position:fixed;inset:0;z-index:2147483000;background:rgba(5,4,15,.6);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);
+    display:flex;align-items:center;justify-content:center;padding:16px;font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif}
+  .ss-wrap[hidden]{display:none}
+  .ss-box{width:100%;max-width:440px;background:#16132f;color:#ecebff;border:1px solid rgba(167,139,250,.3);border-radius:22px;padding:18px;
+    box-shadow:0 20px 60px rgba(0,0,0,.5);animation:ssRise .25s ease both;text-align:left}
+  @keyframes ssRise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  .ss-h{display:flex;justify-content:space-between;align-items:center;font-size:17px;font-weight:700;margin-bottom:14px}
+  .ss-x{border:0;background:rgba(255,255,255,.08);color:#ecebff;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:14px}
+  .ss-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px 6px}
+  .ss-btn{display:flex;flex-direction:column;align-items:center;gap:6px;border:0;background:none;color:#ecebff;font:inherit;font-size:12px;cursor:pointer;padding:4px 0}
+  .ss-ic{width:48px;height:48px;border-radius:50%;display:grid;place-items:center;font-size:20px;font-weight:800;box-shadow:0 4px 14px rgba(0,0,0,.35);transition:transform .15s}
+  .ss-btn:hover .ss-ic{transform:translateY(-2px)}
+  .ss-note{font-size:12px;color:#a29fc2;margin:12px 0 0}
+  .ss-text{width:100%;min-height:96px;margin-top:6px;padding:10px;border-radius:12px;border:1px solid rgba(255,255,255,.09);background:rgba(0,0,0,.3);
+    color:#ecebff;font:inherit;font-size:13px;resize:none;box-sizing:border-box}
+  .ss-msg{text-align:center;font-size:13px;color:#fde68a;min-height:1.4em;margin-top:8px}
+  @media (max-width:520px){.ss-wrap{align-items:flex-end;padding:0}.ss-box{border-radius:22px 22px 0 0;max-width:none;padding-bottom:28px}}`;
+
+  let root = null, cur = null;
+  const $ = sel => root.querySelector(sel);
+  function build() {
+    if (root) return;
+    const st = document.createElement("style"); st.textContent = CSS; document.head.appendChild(st);
+    root = document.createElement("div");
+    root.className = "ss-wrap"; root.hidden = true;
+    root.setAttribute("role", "dialog"); root.setAttribute("aria-modal", "true");
+    root.innerHTML = `<div class="ss-box"><div class="ss-h"><span class="ss-title"></span><button type="button" class="ss-x">✕</button></div>
+      <div class="ss-grid"></div><p class="ss-note"></p><textarea class="ss-text" readonly></textarea><div class="ss-msg"></div></div>`;
+    document.body.appendChild(root);
+    $(".ss-x").addEventListener("click", close);
+    root.addEventListener("click", e => { if (e.target === root) close(); });
+    document.addEventListener("keydown", e => { if (e.key === "Escape" && !root.hidden) close(); });
+    $(".ss-text").addEventListener("focus", e => e.target.select());
+    $(".ss-grid").addEventListener("click", e => {
+      const b = e.target.closest(".ss-btn"); if (!b || !cur) return;
+      const x = TARGETS.find(y => y.key === b.dataset.k);
+      if (x.run) return x.run(cur);
+      const href = x.href(cur);
+      if (x.self) location.href = href; else window.open(href, "_blank", "noopener");
+    });
+  }
+  function close() { if (root) { root.hidden = true; document.body.style.overflow = ""; } }
+
+  function copySync(text) {
+    const ta = document.createElement("textarea");
+    ta.value = text; ta.contentEditable = "true"; ta.setAttribute("aria-hidden", "true");
+    ta.style.cssText = "position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;font-size:16px";
+    document.body.appendChild(ta);
+    let ok = false;
+    try { ta.select(); ta.setSelectionRange(0, text.length); ok = document.execCommand("copy"); } catch (e) {}
+    ta.remove();
+    return ok;
+  }
+  async function copy(text) {
+    if (copySync(text)) return true;
+    try { if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(text); return true; } } catch (e) {}
+    return false;
+  }
+  async function panelCopy(text, okMsg) {
+    const ok = await copy(text);
+    $(".ss-msg").textContent = ok ? okMsg : t("manual");
+    if (!ok) { $(".ss-text").focus(); $(".ss-text").select(); }
+  }
+  const full = s => s.url ? `${s.text}\n\n${t("seeToo")}${s.url}` : s.text;
+  const nativeData = s => s.url ? { text: s.text, url: s.url } : { text: s.text };
+  const canNative = s => !!navigator.share && !IN_APP && (!navigator.canShare || navigator.canShare(nativeData(s)));
+  function loadKakao() {
+    return new Promise((ok, fail) => {
+      if (window.Kakao) return ok(window.Kakao);
+      const sc = document.createElement("script");
+      sc.src = "https://t1.kakaocdn.net/kakao_js_sdk/2.7.2/kakao.min.js"; sc.crossOrigin = "anonymous";
+      sc.onload = () => ok(window.Kakao); sc.onerror = fail; document.head.appendChild(sc);
+    });
+  }
+
+  const TARGETS = [
+    { key: "native", ic: "📱", bg: "linear-gradient(135deg,#8b5cf6,#a78bfa)", fg: "#1c1240",
+      show: s => canNative(s), run: s => navigator.share(nativeData(s)).catch(() => {}) },
+    { key: "kakao", ic: "K", bg: "#FEE500", fg: "#191919",
+      run: async s => {
+        if (API.KAKAO_JS_KEY && s.url) {
+          try {
+            const K = await loadKakao();
+            if (!K.isInitialized()) K.init(API.KAKAO_JS_KEY);
+            K.Share.sendDefault({ objectType: "text", text: s.text.slice(0, 200), link: { mobileWebUrl: s.url, webUrl: s.url }, buttonTitle: t("kakaoBtn") });
+            return;
+          } catch (e) {}
+        }
+        panelCopy(full(s), t("kakaoPaste"));
+      } },
+    { key: "instagram", ic: "◎", bg: "radial-gradient(circle at 30% 110%,#fdf497 0%,#fd5949 45%,#d6249f 62%,#285AEB 95%)", fg: "#fff",
+      // 인스타그램은 웹에서 글을 미리 채워 보낼 수 없어서, 글을 복사해 두고 인스타그램을 열어요
+      run: s => {
+        const ok = copySync(full(s));
+        window.open("https://www.instagram.com/", "_blank", "noopener");
+        if (ok) $(".ss-msg").textContent = t("igPaste"); else panelCopy(full(s), t("igPaste"));
+      } },
+    { key: "threads", ic: "@", bg: "#000", fg: "#fff", href: s => `https://www.threads.net/intent/post?text=${enc(full(s))}` },
+    { key: "x", ic: "𝕏", bg: "#000", fg: "#fff", href: s => `https://twitter.com/intent/tweet?text=${enc(s.text)}${s.url ? "&url=" + enc(s.url) : ""}` },
+    { key: "facebook", ic: "f", bg: "#1877F2", fg: "#fff", show: s => !!s.url, href: s => `https://www.facebook.com/sharer/sharer.php?u=${enc(s.url)}` },
+    { key: "line", ic: "L", bg: "#06C755", fg: "#fff", href: s => `https://line.me/R/share?text=${enc(full(s))}` },
+    { key: "telegram", ic: "✈", bg: "#26A5E4", fg: "#fff", show: s => !!s.url, href: s => `https://t.me/share/url?url=${enc(s.url)}&text=${enc(s.text)}` },
+    { key: "whatsapp", ic: "W", bg: "#25D366", fg: "#fff", href: s => `https://wa.me/?text=${enc(full(s))}` },
+    { key: "sms", ic: "💬", bg: "#34C759", fg: "#fff", show: () => IS_TOUCH, self: true, href: s => `sms:?&body=${enc(full(s))}` },
+  ];
+
+  function open(s) {
+    build();
+    cur = { text: s.text || "", url: s.url || "" };
+    $(".ss-title").textContent = t("title");
+    $(".ss-x").setAttribute("aria-label", t("close"));
+    $(".ss-grid").innerHTML = TARGETS.filter(x => !x.show || x.show(cur)).map(x =>
+      `<button type="button" class="ss-btn" data-k="${x.key}"><span class="ss-ic" style="background:${x.bg};color:${x.fg}">${x.ic}</span><span>${t(x.key)}</span></button>`).join("");
+    $(".ss-note").textContent = cur.url ? t("linked") : t("noLink");
+    $(".ss-text").value = full(cur);
+    $(".ss-msg").textContent = "";
+    root.hidden = false;
+    document.body.style.overflow = "hidden";
+  }
+  // 탭한 순간 바로 불러야 휴대폰이 공유 창을 막지 않아요 (중간에 await 금지)
+  function share(s) {
+    const c = { text: s.text || "", url: s.url || "" };
+    if (!canNative(c)) return open(c);
+    navigator.share(nativeData(c)).catch(err => { if (!err || err.name !== "AbortError") open(c); });
+  }
+
+  const API = { share, open, close, copy, KAKAO_JS_KEY: "" };
+  window.ShareSheet = API;
+})();
+</script>
 
 <!-- 순위표 패널 -->
 <div id="boardPanel" class="hidden">
@@ -404,6 +537,8 @@ const I18N = {
     sharedFallback: "✅ 공유 창을 열 수 없어 대신 복사했어요. 붙여넣기 하세요",
     copyFail: "복사가 안 됐어요. 위 이모지를 길게 눌러 복사하세요",
     panelTitle: "📤 결과 공유하기", panelCopy: "📋 복사하기", panelClose: "닫기",
+    tooSmall: "↕ 창이 너무 작아요. 창을 조금 더 키우면(특히 세로로) 게임을 할 수 있어요.",
+    abortSmall: "창이 너무 작아져서 이번 판은 기록하지 않고 멈췄어요",
     rkTitle: "🏆 오늘의 랭킹", rkNickPh: "닉네임 (12자까지)", rkSubmit: "등록",
     rkNickHint: "가입 없이 닉네임만! 다음 판부터는 자동으로 등록돼요",
     rkSending: "랭킹 등록 중…", rkRetry: "다시 시도", rkViewBoard: "순위표 보기",
@@ -477,6 +612,8 @@ const I18N = {
     sharedFallback: "✅ Sharing isn't available here, so we copied it instead",
     copyFail: "Couldn't copy. Long-press the emoji above to copy",
     panelTitle: "📤 Share your result", panelCopy: "📋 Copy", panelClose: "Close",
+    tooSmall: "↕ The window is too small. Make it a bit bigger (especially taller) to play.",
+    abortSmall: "The window got too small, so this run was stopped without a score",
     rkTitle: "🏆 Today's ranking", rkNickPh: "Nickname (max 12)", rkSubmit: "Submit",
     rkNickHint: "No sign-up, just a nickname. Next runs are submitted automatically.",
     rkSending: "Submitting…", rkRetry: "Retry", rkViewBoard: "View leaderboard",
@@ -541,16 +678,50 @@ function T(key, ...args) {
 /* ===================== 화면 준비 ===================== */
 const cvs = document.getElementById("c");
 const ctx = cvs.getContext("2d");
-let W = 0, H = 0, S = 1;         // S: 화면 크기에 따른 배율
+let W = 0, H = 0, S = 1;         // S: 경기장 크기에 따른 배율
 const TOP = 122;                 // 정보판 높이만큼 위쪽 여백
+const ARENA_RATIO = 9 / 16;      // 경기장(점이 나오는 영역)의 가로:세로 = 휴대폰 세로 화면 비율
+const MIN_ARENA_W = 200;         // 휴대폰·태블릿: 경기장의 최소 가로(px). 이보다 작으면 게임을 할 수 없어요
+const MIN_ARENA_H_PC = 638;      // PC(마우스): 경기장의 최소 세로(px) = 휴대폰(375×812) 경기장 높이. 창 높이로는 약 770px 이상
+const COARSE = !!(window.matchMedia && matchMedia("(pointer: coarse)").matches);   // 손가락으로 하는 기기인지
+let AX = 0, AY = TOP, AW = 0, AH = 0;   // 경기장 위치와 크기 (9:16, 점 크기 기준)
+const FIELD_WIDEN = 1.06;        // 점이 나오고 튕기는 영역은 경기장보다 좌우로 6% 넓게
+let FX = 0, FW = 0;              // 점이 나오는 영역의 왼쪽 끝과 너비 (세로는 경기장과 같아요)
 
+// 경기장은 항상 휴대폰 세로 비율(9:16)이에요.
+//  - PC처럼 넓은 창에서는 점이 가운데 휴대폰 모양 영역(좌우 6% 여유)에서만 나와요. 테두리는 그리지 않아요.
+//  - 창 높이를 줄이면 경기장 너비도 같은 비율로 줄어서, 납작하고 좁은 띠 모양이 될 수 없어요.
+//  - 점 크기·속도도 경기장 너비에 정비례해서, 어느 화면에서나 휴대폰과 같은 난이도예요.
+//    (예전에는 창 높이를 아주 줄이면 점이 늘 비슷한 자리에 나와서 점수를 얻기 쉬웠어요)
+//  - 창 크기를 마음대로 줄일 수 있는 PC는 휴대폰 경기장 높이(638px)보다 작으면 막아요.
+//    휴대폰은 창 크기를 바꿀 수 없고 주소창 때문에 화면이 더 작을 수 있어서 최소 가로만 봐요.
+const fieldOk = () => COARSE ? AW >= MIN_ARENA_W : AH >= MIN_ARENA_H_PC - 0.5;
+const inArena = (x, y) => x >= FX && x <= FX + FW && y >= AY && y <= AY + AH;
+let gameReady = false;           // 게임 상태 변수들이 준비된 뒤에만 점 옮기기·크기 검사를 해요
 function resize() {
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const p = { AX, AY, AW, AH, S };
   W = innerWidth; H = innerHeight;
   cvs.width = W * dpr; cvs.height = H * dpr;
   cvs.style.width = W + "px"; cvs.style.height = H + "px";
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  S = Math.max(0.65, Math.min(1.2, Math.min(W, H) / 600));
+  // 정보판 아래 남은 공간에 들어가는 가장 큰 9:16 경기장
+  const availH = Math.max(0, H - TOP - 10);
+  AH = availH; AW = AH * ARENA_RATIO;
+  if (AW > W - 16) { AW = Math.max(0, W - 16); AH = AW / ARENA_RATIO; }
+  AX = (W - AW) / 2; AY = TOP + (availH - AH) / 2;
+  const pFX = FX, pFW = FW;
+  FW = Math.min(W - 16, AW * FIELD_WIDEN); FX = (W - FW) / 2;
+  S = Math.max(0.05, AW / 600);
+  if (!gameReady) return;
+  // 게임 중에 창 크기가 바뀌면 지금 떠 있는 점도 새 영역에 맞춰 옮기고 크기를 맞춰요
+  if (dot && p.AW > 0) {
+    const k = S / p.S;
+    dot.x = FX + (dot.x - pFX) / pFW * FW;
+    dot.y = AY + (dot.y - p.AY) / p.AH * AH;
+    dot.r *= k; dot.vx *= k; dot.vy *= k;
+  }
+  sizeGuard();
 }
 addEventListener("resize", resize);
 resize();
@@ -805,8 +976,8 @@ function spawn() {
   const special = !blue && spawnCount % SPECIAL_EVERY === 0;
   const r = lv.r * S * (special ? 0.9 : 1);
   const pad = r + 8;
-  const x = W - pad > pad ? rand(pad, W - pad) : W / 2;
-  const y = H - pad > TOP + r ? rand(TOP + r, H - pad) : (TOP + H) / 2;
+  const x = rand(FX + pad, FX + FW - pad);   // 점이 나오는 영역 안 어디든
+  const y = rand(AY + pad, AY + AH - pad);
   const ang = Math.random() * Math.PI * 2;
   const sp = lv.speed * S * (special ? 1.25 : blue ? 1.15 : 1);
   dot = { x, y, r, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp,
@@ -819,7 +990,7 @@ function onBeat() {
   beatNo++;
   const strong = beatNo % 4 === 1;
   sfx.beat(strong);
-  ripples.push({ x: W / 2, y: (TOP + H) / 2, r: 20, a: strong ? 0.35 : 0.18 });
+  ripples.push({ x: AX + AW / 2, y: AY + AH / 2, r: 20, a: strong ? 0.35 : 0.18 });
   // 레벨 4부터는 박자 두 번마다 점이 방향을 휙 바꿈
   if (dot && level >= 3 && beatNo % 2 === 0) {
     const sp = Math.hypot(dot.vx, dot.vy);
@@ -839,8 +1010,8 @@ cvs.addEventListener("pointerdown", e => {
   const x = e.clientX, y = e.clientY;
   if (dot && Math.hypot(x - dot.x, y - dot.y) <= dot.r * 1.15) {
     hitDot(x, y, performance.now());
-  } else {
-    // 빈 곳을 누르면 틀림
+  } else if (inArena(x, y)) {
+    // 경기장 안의 빈 곳을 누르면 틀림 (경기장 바깥 클릭은 무시)
     ripples.push({ x, y, r: 6, a: 0.5, color: "255,93,115", small: true });
     registerMiss(x, y, T("offTarget"));
   }
@@ -880,7 +1051,7 @@ function hitDot(x, y, clickAt) {
 
 /* ===================== 효과 ===================== */
 function addPopup(x, y, text, color, size) {
-  x = Math.max(50, Math.min(W - 50, x));   // 글자가 화면 밖으로 잘리지 않게
+  x = Math.max(40, Math.min(W - 40, x));   // 글자가 화면 밖으로 잘리지 않게
   popups.push({ x, y, text, color, size, age: 0 });
 }
 function burst(x, y, color, n) {
@@ -890,14 +1061,31 @@ function burst(x, y, color, n) {
   }
 }
 
+/* ===================== 창 크기 지킴이 ===================== */
+// 경기장이 너무 작으면 시작을 막고, 게임 중에 너무 작아지면 이번 판은 기록 없이 멈춰요
+function sizeGuard() {
+  const small = !fieldOk();
+  $("sizeGuard").textContent = T("tooSmall");
+  $("sizeGuard").classList.toggle("hidden", !small);
+  if (small && (state === "play" || state === "count")) abortRun();
+}
+function abortRun() {
+  state = "ready"; dot = null;
+  document.body.classList.remove("playing");
+  $("countdown").style.display = "none";
+  $("startScreen").classList.remove("hidden");
+  showToast(T("abortSmall"), "#ef4462");
+}
+
 /* ===================== 진행 ===================== */
 function startGame() {
+  if (!fieldOk()) { sizeGuard(); return; }
   initAudio();
   resetGame();
   $("startScreen").classList.add("hidden");
   $("endScreen").classList.add("hidden");
   $("thanksScreen").classList.add("hidden"); clearTimeout(thanksTimer);
-  $("sharePanel").classList.add("hidden");
+  ShareSheet.close();
   closeBoard(); clearTimeout(retryTimer);
   state = "count"; countT = 3;
   document.body.classList.add("playing");
@@ -1071,33 +1259,15 @@ async function copyText(text) {
   return false;
 }
 
-// 카카오톡·인스타그램·페이스북·라인·네이버 앱 안의 브라우저인지
-const IN_APP = /KAKAOTALK|Instagram|FBAN|FBAV|FB_IAB|Line\/|NAVER\(inapp|DaumApps|everytimeApp|; wv\)/i.test(navigator.userAgent);
 
-// 공유 패널 열기: 자동 복사 시도 + X/LINE 버튼 + 직접 복사할 수 있는 글 상자
-function openSharePanel(text, autoCopy) {
-  $("panelText").value = text;
-  $("panelX").href = "https://twitter.com/intent/tweet?text=" + encodeURIComponent(text);
-  $("panelLine").href = "https://social-plugins.line.me/lineit/share?text=" + encodeURIComponent(text) +
-                        (shareUrl() ? "&url=" + encodeURIComponent(shareUrl()) : "");
-  const ok = autoCopy ? copyTextSync(text) : false;
-  setPanelStatus(ok ? "panelCopied" : "panelManual", !ok);
-  $("panelTip").textContent = IN_APP ? T("panelInApp") : "";
-  $("sharePanel").classList.remove("hidden");
+// 공유 글을 '본문'과 '게임 주소'로 나눠요 (공유 창이 주소를 눌러서 열리는 링크로 붙여 줘요)
+function splitShare(text) {
+  const url = shareUrl();
+  if (!url || !text.includes(url)) return { text, url };
+  return { text: text.replace(url, "").replace(/\n?👉\s*$/, "").trim(), url };
 }
-function setPanelStatus(key, fail) {
-  const st = $("panelStatus");
-  st.textContent = T(key);
-  st.classList.toggle("fail", !!fail);
-}
-$("panelCopy").addEventListener("click", async () => {
-  const ok = await copyText($("panelText").value);
-  if (!ok) { $("panelText").focus(); $("panelText").select(); }
-  setPanelStatus(ok ? "panelCopied" : "panelManual", !ok);
-});
-$("panelClose").addEventListener("click", () => $("sharePanel").classList.add("hidden"));
-$("sharePanel").addEventListener("click", e => { if (e.target.id === "sharePanel") $("sharePanel").classList.add("hidden"); });
-$("panelText").addEventListener("focus", e => e.target.select());
+// 공유 창 열기 (운세 페이지와 같은 아이콘 공유 창: 카카오톡·인스타그램·스레드·X·페이스북·라인·텔레그램·왓츠앱·문자) 
+function openSharePanel(text) { ShareSheet.open(splitShare(text)); }
 
 let msgTimer = 0;
 function shareMessage(key, btn) {
@@ -1115,23 +1285,14 @@ $("copyBtn").addEventListener("click", async () => {
   const text = buildShareText();
   const ok = await copyText(text);
   if (ok) shareMessage("copied", $("copyBtn"));
-  else openSharePanel(text, false);
+  else openSharePanel(text);
 });
 
 // 📤 공유하기
 //  - 휴대폰 브라우저(크롬·사파리 등): 휴대폰 공유 창 (카카오톡·문자·X 등 선택)
-//  - 공유 창이 없는 곳(카카오톡 안 브라우저, PC 일부): 공유 패널 (자동 복사 + X·LINE 버튼)
+//  - 공유 창이 없는 곳(카카오톡 안 브라우저, PC 일부): 아이콘 공유 창 (카카오톡·X·페이스북·라인 등)
 $("shareBtn").addEventListener("click", () => shareOut(buildShareText()));
-function shareOut(text) {
-  const data = { text };
-  const canNative = !!navigator.share && !IN_APP && (!navigator.canShare || navigator.canShare(data));
-  if (!canNative) { openSharePanel(text, true); return; }
-  // 탭한 순간 바로 호출해야 함 (중간에 await가 있으면 휴대폰이 막음)
-  navigator.share(data).catch(err => {
-    if (err && err.name === "AbortError") return;   // 사용자가 공유 창을 닫음
-    openSharePanel(text, false);                    // 실패 → 패널에서 버튼을 한 번 더 누르면 복사
-  });
-}
+function shareOut(text) { ShareSheet.share(splitShare(text)); }   // 탭한 순간 바로 호출 (휴대폰이 막지 않게)
 
 /* ===================== 랭킹: 오늘의 랭킹 + 단톡방 대결방 ===================== */
 const RANKING_ON = !!(SUPABASE_URL && SUPABASE_KEY);
@@ -1441,10 +1602,11 @@ function update(dt) {
       const surge = 0.55 + pulse * 1.3;
       dot.x += dot.vx * dt * surge;
       dot.y += dot.vy * dt * surge;
-      if (dot.x < dot.r) { dot.x = dot.r; dot.vx = Math.abs(dot.vx); }
-      if (dot.x > W - dot.r) { dot.x = W - dot.r; dot.vx = -Math.abs(dot.vx); }
-      if (dot.y < TOP + dot.r) { dot.y = TOP + dot.r; dot.vy = Math.abs(dot.vy); }
-      if (dot.y > H - dot.r) { dot.y = H - dot.r; dot.vy = -Math.abs(dot.vy); }
+      // 점이 나오는 영역의 가장자리에서 튕겨요
+      if (dot.x < FX + dot.r) { dot.x = FX + dot.r; dot.vx = Math.abs(dot.vx); }
+      if (dot.x > FX + FW - dot.r) { dot.x = FX + FW - dot.r; dot.vx = -Math.abs(dot.vx); }
+      if (dot.y < AY + dot.r) { dot.y = AY + dot.r; dot.vy = Math.abs(dot.vy); }
+      if (dot.y > AY + AH - dot.r) { dot.y = AY + AH - dot.r; dot.vy = -Math.abs(dot.vy); }
       if (dot.age >= dot.life) {   // 시간 안에 못 누름
         registerMiss(dot.x, dot.y, "MISS");
         if (state === "play") spawn();
@@ -1472,7 +1634,8 @@ function draw() {
 
   // 배경: 레벨이 오를수록 살짝 붉어지는 빛 + 박자 파동
   const hue = 235 - level * (170 / (LEVELS.length - 1));   // 레벨이 오를수록 남색 → 붉은빛
-  const g = ctx.createRadialGradient(W / 2, (TOP + H) / 2, 0, W / 2, (TOP + H) / 2, Math.max(W, H) * 0.7);
+  const cx = W / 2, cy = AY + AH / 2;                    // 화면 전체가 하나의 배경 (영역 테두리 없음)
+  const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(W, H) * 0.7);
   g.addColorStop(0, `hsla(${hue},70%,${97 - pulse * 3}%,1)`);   // 가운데: 거의 흰색 (박자마다 살짝 물듦)
   g.addColorStop(1, `hsla(${hue},35%,92%,1)`);                   // 가장자리: 옅은 색
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
@@ -1561,6 +1724,8 @@ $("startBtn").addEventListener("click", startGame);
 $("againBtn").addEventListener("click", startGame);
 applyLang();
 updateHud();
+gameReady = true;
+sizeGuard();          // 처음부터 창이 너무 작으면 안내를 띄워요
 </script>
 </body>
 </html>
